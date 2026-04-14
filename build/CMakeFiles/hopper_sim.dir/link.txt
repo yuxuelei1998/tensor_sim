@@ -1,0 +1,2 @@
+G:\msys64\ucrt64\bin\ar.exe qc libhopper_sim.a CMakeFiles/hopper_sim.dir/src/hopper_tensor.cpp.obj
+G:\msys64\ucrt64\bin\ranlib.exe libhopper_sim.a

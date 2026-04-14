@@ -1,0 +1,3 @@
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E rm -f CMakeFiles\test_hopper.dir/objects.a
+G:\msys64\ucrt64\bin\ar.exe qc CMakeFiles\test_hopper.dir/objects.a @CMakeFiles\test_hopper.dir\objects1.rsp
+G:\msys64\ucrt64\bin\g++.exe -O3 -DNDEBUG -Wl,--whole-archive CMakeFiles\test_hopper.dir/objects.a -Wl,--no-whole-archive -o test_hopper.exe -Wl,--out-implib,libtest_hopper.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\test_hopper.dir\linkLibs.rsp

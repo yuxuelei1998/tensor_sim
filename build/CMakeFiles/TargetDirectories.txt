@@ -1,0 +1,12 @@
+G:/tensorscope/tensor_sim/build/CMakeFiles/volta_sim.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/ampere_sim.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/hopper_sim.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/blackwell_sim.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/test_volta.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/test_ampere.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/test_hopper.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/test_blackwell.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/tensor_sim.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/test.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/edit_cache.dir
+G:/tensorscope/tensor_sim/build/CMakeFiles/rebuild_cache.dir

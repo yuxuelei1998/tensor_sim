@@ -1,0 +1,2 @@
+G:\msys64\ucrt64\bin\ar.exe qc libampere_sim.a CMakeFiles/ampere_sim.dir/src/ampere_tensor.cpp.obj
+G:\msys64\ucrt64\bin\ranlib.exe libampere_sim.a

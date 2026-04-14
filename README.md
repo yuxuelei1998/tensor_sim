@@ -26,25 +26,25 @@ TensorSim is a **bit-accurate C++ simulator** for NVIDIA GPU Tensor Cores. It re
 
 | Architecture | Operation | Group Size | A/B Input Type | Accumulator (C/D) | Rounding |
 |--------------|-----------|-----------|---------------|-------------------|----------|
-| Volta     | DP4A (4-point dot-product accumulate)  |  4 | FP16     | FP32 | Truncation (round toward zero) |
+| Volta     | DP4A (4-point dot-product accumulate)  |  4 | FP16     | FP32 | TC-Truncation (round toward zero) |
 | Volta     | DP4A (4-point dot-product accumulate)  |  4 | FP16     | FP16 | Round-to-nearest-even (RNE) |
-| Ampere    | DP8A (8-point dot-product accumulate)  |  8 | FP16     | FP32 | Truncation |
+| Ampere    | DP8A (8-point dot-product accumulate)  |  8 | FP16     | FP32 | TC-Truncation |
 | Ampere    | DP8A (8-point dot-product accumulate)  |  8 | FP16     | FP16 | RNE |
-| Ampere    | DP8A (8-point dot-product accumulate)  |  8 | BF16     | FP32 | Truncation |
-| Hopper    | DP16A (16-point dot-product accumulate)| 16 | FP16     | FP32 | Truncation |
+| Ampere    | DP8A (8-point dot-product accumulate)  |  8 | BF16     | FP32 | TC-Truncation |
+| Hopper    | DP16A (16-point dot-product accumulate)| 16 | FP16     | FP32 | TC-Truncation |
 | Hopper    | DP16A (16-point dot-product accumulate)| 16 | FP16     | FP16 | RNE |
-| Hopper    | DP16A (16-point dot-product accumulate)| 16 | BF16     | FP32 | Truncation |
-| Hopper    | DP32A (32-point dot-product accumulate)| 32 | FP8 E5M2 | FP32 | Truncation |
-| Hopper    | DP32A (32-point dot-product accumulate)| 32 | FP8 E5M2 | FP16 | Truncation |
-| Hopper    | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP32 | Truncation |
-| Hopper    | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP16 | Truncation |
-| Blackwell | DP16A (16-point dot-product accumulate)| 16 | FP16     | FP32 | Truncation |
+| Hopper    | DP16A (16-point dot-product accumulate)| 16 | BF16     | FP32 | TC-Truncation |
+| Hopper    | DP32A (32-point dot-product accumulate)| 32 | FP8 E5M2 | FP32 | TC-Truncation |
+| Hopper    | DP32A (32-point dot-product accumulate)| 32 | FP8 E5M2 | FP16 | RNE |
+| Hopper    | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP32 | TC-Truncation |
+| Hopper    | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP16 | RNE |
+| Blackwell | DP16A (16-point dot-product accumulate)| 16 | FP16     | FP32 | TC-Truncation |
 | Blackwell | DP16A (16-point dot-product accumulate)| 16 | FP16     | FP16 | RNE |
-| Blackwell | DP16A (16-point dot-product accumulate)| 16 | BF16     | FP32 | Truncation |
-| Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E5M2 | FP32 | Truncation |
-| Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E5M2 | FP16 | Truncation |
-| Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP32 | Truncation |
-| Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP16 | Truncation |
+| Blackwell | DP16A (16-point dot-product accumulate)| 16 | BF16     | FP32 | TC-Truncation |
+| Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E5M2 | FP32 | TC-Truncation |
+| Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E5M2 | FP16 | RNE |
+| Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP32 | TC-Truncation |
+| Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP16 | RNE |
 
 ---
 
@@ -107,7 +107,7 @@ After alignment, the values are summed as integers. The result is normalized in 
 
 | Mode | Internal exponent range | Rounding |
 |------|-------------------------|----------|
-| FP32 accumulator | Full FP32 range (8-bit biased exponent) | Truncation |
+| FP32 accumulator | Full FP32 range (8-bit biased exponent) | TC-Truncation |
 | FP16 accumulator | FP16 range (5-bit biased exponent); out-of-range clamped to ±Inf/0 | RNE |
 
 **Public API**
@@ -148,7 +148,7 @@ All 9 intermediate values (8 products + C) are aligned to $e_{\max}$:
 
 - Product $p_k = \text{FP16}_k \times \text{FP16}_k$; the product of two 11-bit significands is mapped to the 24-bit mantissa field.
 - C is extended to 24 bits by left-shifting the 23-bit FP32 mantissa by 1.
-- Rounding: **truncation**.
+- Rounding: **TC-truncation**.
 
 **Variant 2: FP16 inputs + FP16 accumulator**
 
@@ -160,7 +160,7 @@ All 9 intermediate values (8 products + C) are aligned to $e_{\max}$:
 
 - BF16 has an 8-bit significand (1 + 7 mantissa bits); the product of two 8-bit significands (14–16 bit range) is mapped to the 24-bit mantissa field.
 - BF16 and FP32 share the same 8-bit exponent domain (bias 127), so products cannot overflow the FP32 exponent range.
-- Rounding: **truncation**.
+- Rounding: **TC-truncation**.
 
 **Public API**
 
@@ -201,9 +201,9 @@ All 17 intermediate values (16 products + C) are aligned to $e_{\max}$:
 
 | Input type | Accumulator | Rounding |
 |------------|-------------|----------|
-| FP16 | FP32 | Truncation |
+| FP16 | FP32 | TC-Truncation |
 | FP16 | FP16 | RNE |
-| BF16 | FP32 | Truncation |
+| BF16 | FP32 | TC-Truncation |
 
 **Public API**
 
@@ -233,10 +233,10 @@ All 33 intermediate values (32 products + C) are aligned to $e_{\max}$:
 
 | Input type | Accumulator | Rounding |
 |------------|-------------|----------|
-| FP8 E5M2 | FP32 | Truncation |
-| FP8 E5M2 | FP16 | Truncation |
-| FP8 E4M3 | FP32 | Truncation |
-| FP8 E4M3 | FP16 | Truncation |
+| FP8 E5M2 | FP32 | TC-Truncation |
+| FP8 E5M2 | FP16 | RNE |
+| FP8 E4M3 | FP32 | TC-Truncation |
+| FP8 E4M3 | FP16 | RNE |
 
 **Public API**
 
@@ -255,7 +255,7 @@ Blackwell's DP16A is identical to Hopper's (same group size, same 25-bit mantiss
 
 #### DP16A (16-point dot-product accumulate)
 
-Same specification as Hopper DP16A (25-bit mantissa, truncation / RNE).
+Same specification as Hopper DP16A (25-bit mantissa, TC-truncation / RNE).
 
 **Public API**
 
@@ -279,10 +279,10 @@ The mantissa field $m$ is upgraded to **25 bits** (12 bits wider than Hopper's D
 
 | Input type | Accumulator | Rounding |
 |------------|-------------|----------|
-| FP8 E5M2 | FP32 | Truncation |
-| FP8 E5M2 | FP16 | Truncation |
-| FP8 E4M3 | FP32 | Truncation |
-| FP8 E4M3 | FP16 | Truncation |
+| FP8 E5M2 | FP32 | TC-Truncation |
+| FP8 E5M2 | FP16 | RNE |
+| FP8 E4M3 | FP32 | TC-Truncation |
+| FP8 E4M3 | FP16 | RNE |
 
 **Public API**
 

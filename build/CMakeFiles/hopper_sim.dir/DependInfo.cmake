@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "G:/tensorscope/tensor_sim/src/hopper_tensor.cpp" "CMakeFiles/hopper_sim.dir/src/hopper_tensor.cpp.obj" "gcc" "CMakeFiles/hopper_sim.dir/src/hopper_tensor.cpp.obj.d"
+  "G:/tensor_sim/src/hopper_tensor.cpp" "CMakeFiles/hopper_sim.dir/src/hopper_tensor.cpp.obj" "gcc" "CMakeFiles/hopper_sim.dir/src/hopper_tensor.cpp.obj.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

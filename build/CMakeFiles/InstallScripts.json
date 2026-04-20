@@ -1,7 +1,7 @@
 {
 	"InstallScripts" : 
 	[
-		"G:/tensorscope/tensor_sim/build/cmake_install.cmake"
+		"G:/tensor_sim/build/cmake_install.cmake"
 	],
 	"Parallel" : false
 }

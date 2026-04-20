@@ -1,7 +1,6 @@
 CMakeFiles/ampere_sim.dir/src/ampere_tensor.cpp.obj: \
- G:\tensorscope\tensor_sim\src\ampere_tensor.cpp \
- G:/tensorscope/tensor_sim/include/ampere_tensor.h \
- G:/tensorscope/tensor_sim/include/fp_utils.h \
+ G:\tensor_sim\src\ampere_tensor.cpp \
+ G:/tensor_sim/include/ampere_tensor.h G:/tensor_sim/include/fp_utils.h \
  G:/msys64/ucrt64/include/c++/15.2.0/cstdint \
  G:/msys64/ucrt64/include/c++/15.2.0/x86_64-w64-mingw32/bits/c++config.h \
  G:/msys64/ucrt64/include/c++/15.2.0/x86_64-w64-mingw32/bits/os_defines.h \

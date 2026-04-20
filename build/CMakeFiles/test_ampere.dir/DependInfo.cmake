@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "G:/tensorscope/tensor_sim/tests/test_ampere.cpp" "CMakeFiles/test_ampere.dir/tests/test_ampere.cpp.obj" "gcc" "CMakeFiles/test_ampere.dir/tests/test_ampere.cpp.obj.d"
+  "G:/tensor_sim/tests/test_ampere.cpp" "CMakeFiles/test_ampere.dir/tests/test_ampere.cpp.obj" "gcc" "CMakeFiles/test_ampere.dir/tests/test_ampere.cpp.obj.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

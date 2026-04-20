@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "G:/tensorscope/tensor_sim/src/volta_tensor.cpp" "CMakeFiles/volta_sim.dir/src/volta_tensor.cpp.obj" "gcc" "CMakeFiles/volta_sim.dir/src/volta_tensor.cpp.obj.d"
+  "G:/tensor_sim/src/volta_tensor.cpp" "CMakeFiles/volta_sim.dir/src/volta_tensor.cpp.obj" "gcc" "CMakeFiles/volta_sim.dir/src/volta_tensor.cpp.obj.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

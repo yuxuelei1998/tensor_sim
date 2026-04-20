@@ -1,3 +1,3 @@
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E rm -f CMakeFiles\tensor_sim.dir/objects.a
+"G:\CLion 2025.2.3\bin\cmake\win\x64\bin\cmake.exe" -E rm -f CMakeFiles\tensor_sim.dir/objects.a
 G:\msys64\ucrt64\bin\ar.exe qc CMakeFiles\tensor_sim.dir/objects.a @CMakeFiles\tensor_sim.dir\objects1.rsp
-G:\msys64\ucrt64\bin\g++.exe -O3 -DNDEBUG -static-libgcc -static-libstdc++ -Wl,--whole-archive CMakeFiles\tensor_sim.dir/objects.a -Wl,--no-whole-archive -o tensor_sim.exe -Wl,--out-implib,libtensor_sim.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\tensor_sim.dir\linkLibs.rsp
+G:\msys64\ucrt64\bin\c++.exe -static-libgcc -static-libstdc++ -Wl,--whole-archive CMakeFiles\tensor_sim.dir/objects.a -Wl,--no-whole-archive -o tensor_sim.exe -Wl,--out-implib,libtensor_sim.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\tensor_sim.dir\linkLibs.rsp

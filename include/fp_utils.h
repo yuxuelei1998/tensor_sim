@@ -140,6 +140,31 @@ inline float e4m3_to_float(e4m3_t x) {
     return bits_to_float((s << 31) | ((uint32_t)(127 + e - 7) << 23) | mant32);
 }
 
+using e2m1_t = uint8_t;
+
+inline bool     e2m1_sign  (e2m1_t x) { return (x >> 3) & 1u; }
+inline int      e2m1_exp   (e2m1_t x) { return (x >> 1) & 0x3; }
+inline uint32_t e2m1_mant  (e2m1_t x) { return x & 0x1u; }
+
+inline bool e2m1_is_nan    (e2m1_t)   { return false; }
+inline bool e2m1_is_inf    (e2m1_t)   { return false; }
+inline bool e2m1_is_zero   (e2m1_t x) { return (x & 0x7u) == 0; }
+inline bool e2m1_is_subnorm(e2m1_t x) { return e2m1_exp(x) == 0 && e2m1_mant(x) != 0; }
+
+inline float e2m1_to_float(e2m1_t x) {
+    uint32_t s = (x >> 3) & 1u;
+    int      e = (x >> 1) & 0x3;
+    uint32_t m = x & 0x1u;
+    if (e == 0) {
+        if (m == 0) return bits_to_float(s << 31);
+        float val = 0.5f;
+        if (s) val = -val;
+        return val;
+    }
+    uint32_t mant32 = m << 22;
+    return bits_to_float((s << 31) | ((uint32_t)(127 + e - 1) << 23) | mant32);
+}
+
 inline fp16_t float_to_fp16(float f) {
     fp32_t fb = float_to_bits(f);
     uint32_t s = fb >> 31;

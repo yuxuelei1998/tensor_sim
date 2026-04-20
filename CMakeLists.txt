@@ -4,14 +4,12 @@ project(tensor_sim CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Warnings
 if(MSVC)
     add_compile_options(/W4)
 else()
     add_compile_options(-Wall -Wextra -O2)
 endif()
 
-# Libraries
 add_library(volta_sim
     src/volta_tensor.cpp
 )
@@ -32,7 +30,6 @@ add_library(blackwell_sim
 )
 target_include_directories(blackwell_sim PUBLIC include)
 
-# Test executables
 add_executable(test_volta
     tests/test_volta.cpp
 )
@@ -57,7 +54,6 @@ add_executable(test_blackwell
 target_link_libraries(test_blackwell PRIVATE blackwell_sim)
 target_include_directories(test_blackwell PRIVATE include)
 
-# Interactive simulator main executable
 add_executable(tensor_sim
     main.cpp
 )
@@ -66,12 +62,11 @@ target_include_directories(tensor_sim PRIVATE include)
 target_compile_definitions(tensor_sim PRIVATE
     TENSOR_SIM_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
-# Static link runtime so the .exe runs without MSYS2/MinGW DLLs in PATH
+
 if(MINGW)
     target_link_options(tensor_sim PRIVATE -static-libgcc -static-libstdc++)
 endif()
 
-# CTest integration
 enable_testing()
 add_test(NAME volta_tests     COMMAND test_volta)
 add_test(NAME ampere_tests    COMMAND test_ampere)

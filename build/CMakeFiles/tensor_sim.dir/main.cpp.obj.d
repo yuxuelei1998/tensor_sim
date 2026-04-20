@@ -1,5 +1,4 @@
-CMakeFiles/tensor_sim.dir/main.cpp.obj: \
- G:\tensorscope\tensor_sim\main.cpp \
+CMakeFiles/tensor_sim.dir/main.cpp.obj: G:\tensor_sim\main.cpp \
  G:/msys64/ucrt64/include/c++/15.2.0/iostream \
  G:/msys64/ucrt64/include/c++/15.2.0/bits/requires_hosted.h \
  G:/msys64/ucrt64/include/c++/15.2.0/x86_64-w64-mingw32/bits/c++config.h \
@@ -187,11 +186,10 @@ CMakeFiles/tensor_sim.dir/main.cpp.obj: \
  G:/msys64/ucrt64/include/c++/15.2.0/ext/aligned_buffer.h \
  G:/msys64/ucrt64/include/c++/15.2.0/bits/fs_dir.h \
  G:/msys64/ucrt64/include/c++/15.2.0/bits/fs_ops.h \
- G:/tensorscope/tensor_sim/include/volta_tensor.h \
- G:/tensorscope/tensor_sim/include/fp_utils.h \
+ G:/tensor_sim/include/volta_tensor.h G:/tensor_sim/include/fp_utils.h \
  G:/msys64/ucrt64/include/c++/15.2.0/cstring \
  G:/msys64/ucrt64/include/string.h \
  G:/msys64/ucrt64/include/sec_api/string_s.h \
- G:/tensorscope/tensor_sim/include/ampere_tensor.h \
- G:/tensorscope/tensor_sim/include/hopper_tensor.h \
- G:/tensorscope/tensor_sim/include/blackwell_tensor.h
+ G:/tensor_sim/include/ampere_tensor.h \
+ G:/tensor_sim/include/hopper_tensor.h \
+ G:/tensor_sim/include/blackwell_tensor.h

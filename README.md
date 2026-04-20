@@ -300,7 +300,7 @@ fp16_t blackwell_dp32a_e4m3_fp16(const e4m3_t* a, const e4m3_t* b, size_t len, f
 ```
 tensor_sim/
 ├── CMakeLists.txt
-├── main.cpp                       # Interactive CLI entry point (tensorscope)
+├── main.cpp                       # Interactive CLI entry point (tensor_sim)
 ├── include/
 │   ├── fp_utils.h                 # Bit-manipulation utilities for FP16 / BF16 / FP8 / FP32
 │   ├── volta_tensor.h             # Volta DP4A declarations
@@ -352,7 +352,7 @@ Build artifacts:
 | `test_ampere.exe`   | Ampere unit test executable |
 | `test_hopper.exe`   | Hopper unit test executable |
 | `test_blackwell.exe`| Blackwell unit test executable |
-| `tensorscope.exe`   | Interactive simulator |
+| `tensor_sim.exe`   | Interactive simulator |
 
 ---
 
@@ -380,10 +380,10 @@ Test coverage (all architectures):
 
 ## Interactive CLI Tool
 
-Run `tensorscope.exe` and follow the prompts to select architecture, accumulator precision, and A/B vector precision. The program reads the corresponding test vector file, appends the simulation results, and writes output to the `results/` directory.
+Run `tensor_sim.exe` and follow the prompts to select architecture, accumulator precision, and A/B vector precision. The program reads the corresponding test vector file, appends the simulation results, and writes output to the `results/` directory.
 
 ```
-=== TensorScope Tensor Core Simulator ===
+=== Tensor Core Simulator ===
 
 Select architecture:
   1. Volta

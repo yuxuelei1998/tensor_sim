@@ -32,7 +32,7 @@ static std::string trim(const std::string& s) {
 
 int main() {
 
-    std::cout << "=== TensorScope Tensor Core Simulator ===\n\n";
+    std::cout << "=== Tensor Core Simulator ===\n\n";
     std::cout << "Select architecture:\n"
               << "  1. Volta\n"
               << "  2. Ampere\n"
@@ -74,18 +74,22 @@ int main() {
               << "  2. BF16\n"
               << "  3. FP8_E5M2\n"
               << "  4. FP8_E4M3\n"
-              << "  5. NVFP4_E2M1\n"
-              << "Enter choice (1-5): ";
+              << "  5. FP4_E2M1 (no scale)\n"
+              << "  6. FP4_E2M1_E8 (MXFP4, E8 scale)\n"
+              << "  7. FP4_E2M1_UE4M3 (NVFP4, UE4M3 scale)\n"
+              << "Enter choice (1-7): ";
     int ab_choice = 0;
     std::cin >> ab_choice;
 
     std::string ab_type;
     switch (ab_choice) {
-        case 1: ab_type = "fp16";       break;
-        case 2: ab_type = "bf16";       break;
-        case 3: ab_type = "fp8_e5m2";   break;
-        case 4: ab_type = "fp8_e4m3";   break;
-        case 5: ab_type = "nvfp4_e2m1"; break;
+        case 1: ab_type = "fp16";             break;
+        case 2: ab_type = "bf16";             break;
+        case 3: ab_type = "fp8_e5m2";         break;
+        case 4: ab_type = "fp8_e4m3";         break;
+        case 5: ab_type = "fp4_e2m1";         break;
+        case 6: ab_type = "fp4_e2m1_e8";      break;
+        case 7: ab_type = "fp4_e2m1_ue4m3";   break;
         default:
             std::cerr << "Invalid A/B precision choice.\n";
             return 1;
@@ -115,6 +119,9 @@ int main() {
     if (arch_name == "Blackwell" && ab_type == "bf16" && c_type == "fp32")     implemented = true;
     if (arch_name == "Blackwell" && ab_type == "fp8_e5m2")                     implemented = true;
     if (arch_name == "Blackwell" && ab_type == "fp8_e4m3")                     implemented = true;
+    if (arch_name == "Blackwell" && ab_type == "fp4_e2m1")                     implemented = true;
+    if (arch_name == "Blackwell" && ab_type == "fp4_e2m1_e8"    && c_type == "fp32") implemented = true;
+    if (arch_name == "Blackwell" && ab_type == "fp4_e2m1_ue4m3" && c_type == "fp32") implemented = true;
 
     if (!implemented) {
         std::cerr << "Error: " << arch_name << " + " << ab_type
@@ -158,8 +165,19 @@ int main() {
         }
 
         const size_t n_ab    = vals.size() - 1;
-        const size_t vec_len = n_ab / 2;
         const uint32_t c_raw = vals.back();
+
+        size_t vec_len = 0;
+        size_t n_sa = 0, n_sb = 0;
+        if (ab_type == "fp4_e2m1_e8") {
+            n_sa = 2; n_sb = 2;
+            vec_len = (n_ab - n_sa - n_sb) / 2;
+        } else if (ab_type == "fp4_e2m1_ue4m3") {
+            n_sa = 4; n_sb = 4;
+            vec_len = (n_ab - n_sa - n_sb) / 2;
+        } else {
+            vec_len = n_ab / 2;
+        }
 
         fout << stripped;
 
@@ -326,6 +344,51 @@ int main() {
                 fout << ", 0x" << std::uppercase << std::hex
                      << std::setw(4) << std::setfill('0') << result << "\n";
             }
+
+        } else if (arch_name == "Blackwell" && ab_type == "fp4_e2m1") {
+            std::vector<e2m1_t> A(vec_len), B(vec_len);
+            for (size_t i = 0; i < vec_len; ++i) A[i] = static_cast<e2m1_t>(vals[i]);
+            for (size_t i = 0; i < vec_len; ++i) B[i] = static_cast<e2m1_t>(vals[vec_len + i]);
+
+            if (c_type == "fp32") {
+                fp32_t result = blackwell_dp64a_e2m1_fp32(A.data(), B.data(), vec_len,
+                                                           static_cast<fp32_t>(c_raw));
+                fout << ", 0x" << std::uppercase << std::hex
+                     << std::setw(8) << std::setfill('0') << result << "\n";
+            } else {
+                fp16_t result = blackwell_dp64a_e2m1_fp16(A.data(), B.data(), vec_len,
+                                                           static_cast<fp16_t>(c_raw));
+                fout << ", 0x" << std::uppercase << std::hex
+                     << std::setw(4) << std::setfill('0') << result << "\n";
+            }
+
+        } else if (arch_name == "Blackwell" && ab_type == "fp4_e2m1_e8") {
+            std::vector<e2m1_t> A(vec_len), B(vec_len);
+            for (size_t i = 0; i < vec_len; ++i) A[i] = static_cast<e2m1_t>(vals[i]);
+            for (size_t i = 0; i < vec_len; ++i) B[i] = static_cast<e2m1_t>(vals[vec_len + i]);
+            size_t scale_base = 2 * vec_len;
+            std::vector<uint8_t> sa(n_sa), sb(n_sb);
+            for (size_t i = 0; i < n_sa; ++i) sa[i] = static_cast<uint8_t>(vals[scale_base + i]);
+            for (size_t i = 0; i < n_sb; ++i) sb[i] = static_cast<uint8_t>(vals[scale_base + n_sa + i]);
+
+            fp32_t result = blackwell_mxfp4_e2m1_e8_fp32(A.data(), B.data(), sa.data(), sb.data(), vec_len,
+                                                          static_cast<fp32_t>(c_raw));
+            fout << ", 0x" << std::uppercase << std::hex
+                 << std::setw(8) << std::setfill('0') << result << "\n";
+
+        } else if (arch_name == "Blackwell" && ab_type == "fp4_e2m1_ue4m3") {
+            std::vector<e2m1_t> A(vec_len), B(vec_len);
+            for (size_t i = 0; i < vec_len; ++i) A[i] = static_cast<e2m1_t>(vals[i]);
+            for (size_t i = 0; i < vec_len; ++i) B[i] = static_cast<e2m1_t>(vals[vec_len + i]);
+            size_t scale_base = 2 * vec_len;
+            std::vector<uint8_t> sa(n_sa), sb(n_sb);
+            for (size_t i = 0; i < n_sa; ++i) sa[i] = static_cast<uint8_t>(vals[scale_base + i]);
+            for (size_t i = 0; i < n_sb; ++i) sb[i] = static_cast<uint8_t>(vals[scale_base + n_sa + i]);
+
+            fp32_t result = blackwell_nvfp4_e2m1_ue4m3_fp32(A.data(), B.data(), sa.data(), sb.data(), vec_len,
+                                                             static_cast<fp32_t>(c_raw));
+            fout << ", 0x" << std::uppercase << std::hex
+                 << std::setw(8) << std::setfill('0') << result << "\n";
         }
     }
 

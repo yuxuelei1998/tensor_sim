@@ -81,6 +81,23 @@ static E4M3Norm decode_e4m3(e4m3_t x) {
     return r;
 }
 
+struct E2M1Norm { bool sign; int32_t exp; uint32_t sig; };
+
+static E2M1Norm decode_e2m1(e2m1_t x) {
+    E2M1Norm r{};
+    r.sign = e2m1_sign(x);
+    int      e = e2m1_exp(x);
+    uint32_t m = e2m1_mant(x);
+    if (e == 0) {
+        r.sig = m << 1;
+        r.exp = -1;
+    } else {
+        r.exp = e - 1;
+        r.sig = (1u << 1) | m;
+    }
+    return r;
+}
+
 static void mul11_25(uint32_t sig_a, int32_t exp_a,
                      uint32_t sig_b, int32_t exp_b,
                      int32_t& out_exp, uint32_t& out_mant) {
@@ -133,6 +150,19 @@ static void mul4_25(uint32_t sig_a, int32_t exp_a,
     } else {
 
         out_mant = (prod - (1u << 6)) << 19;
+        out_exp  = exp_a + exp_b;
+    }
+}
+
+static void mul2_25(uint32_t sig_a, int32_t exp_a,
+                    uint32_t sig_b, int32_t exp_b,
+                    int32_t& out_exp, uint32_t& out_mant) {
+    uint32_t prod = sig_a * sig_b;
+    if (prod >= (1u << 3)) {
+        out_mant = (prod - (1u << 3)) << 22;
+        out_exp  = exp_a + exp_b + 1;
+    } else {
+        out_mant = (prod - (1u << 2)) << 23;
         out_exp  = exp_a + exp_b;
     }
 }
@@ -251,6 +281,38 @@ static IntermVal e4m3_mul_fp16acc_25(e4m3_t a, e4m3_t b) {
     E4M3Norm na = decode_e4m3(a), nb = decode_e4m3(b);
     int32_t e; uint32_t m;
     mul4_25(na.sig, na.exp, nb.sig, nb.exp, e, m);
+    if (e > 15)  return {rs ? IntermVal::NEG_INF_OVF : IntermVal::POS_INF_OVF, rs};
+    if (e >= -14) return {IntermVal::NORMAL, rs, e, m};
+
+    int shift = -14 - e;
+    static constexpr int SHIFT_CAP = 26;
+    if (shift >= SHIFT_CAP) return {IntermVal::ZERO};
+    uint64_t full_sig = ((uint64_t)1 << 25) | m;
+    uint64_t sub_sig  = full_sig >> shift;
+    if (sub_sig == 0) return {IntermVal::ZERO};
+    int lead = 63 - __builtin_clzll(sub_sig);
+    int32_t new_exp = lead - 39;
+    uint32_t new_mant;
+    if (lead >= 25) new_mant = (uint32_t)((sub_sig >> (lead - 25)) & 0x1FFFFFFu);
+    else            new_mant = (uint32_t)((sub_sig << (25 - lead)) & 0x1FFFFFFu);
+    return {IntermVal::NORMAL, rs, new_exp, new_mant};
+}
+
+static IntermVal e2m1_mul_fp32acc_25(e2m1_t a, e2m1_t b) {
+    bool rs = e2m1_sign(a) ^ e2m1_sign(b);
+    if (e2m1_is_zero(a) || e2m1_is_zero(b))                  return {IntermVal::ZERO};
+    E2M1Norm na = decode_e2m1(a), nb = decode_e2m1(b);
+    int32_t e; uint32_t m;
+    mul2_25(na.sig, na.exp, nb.sig, nb.exp, e, m);
+    return {IntermVal::NORMAL, rs, e, m};
+}
+
+static IntermVal e2m1_mul_fp16acc_25(e2m1_t a, e2m1_t b) {
+    bool rs = e2m1_sign(a) ^ e2m1_sign(b);
+    if (e2m1_is_zero(a) || e2m1_is_zero(b))                  return {IntermVal::ZERO};
+    E2M1Norm na = decode_e2m1(a), nb = decode_e2m1(b);
+    int32_t e; uint32_t m;
+    mul2_25(na.sig, na.exp, nb.sig, nb.exp, e, m);
     if (e > 15)  return {rs ? IntermVal::NEG_INF_OVF : IntermVal::POS_INF_OVF, rs};
     if (e >= -14) return {IntermVal::NORMAL, rs, e, m};
 
@@ -563,6 +625,24 @@ static fp16_t bw_dp32a_e4m3_fp16_group(const e4m3_t a[32], const e4m3_t b[32], f
     return accumulate_fp16_rne(v, 33);
 }
 
+static fp32_t bw_dp64a_e2m1_fp32_group(const e2m1_t a[64], const e2m1_t b[64], fp32_t c) {
+    if (fp32_is_nan(c)) return NAN_OUT_FP32;
+
+    IntermVal v[65];
+    for (int i = 0; i < 64; ++i) v[i] = e2m1_mul_fp32acc_25(a[i], b[i]);
+    v[64] = fp32_to_intermed25(c);
+    return accumulate_fp32_trunc(v, 65);
+}
+
+static fp16_t bw_dp64a_e2m1_fp16_group(const e2m1_t a[64], const e2m1_t b[64], fp16_t c) {
+    if (fp16_is_nan(c)) return NAN_OUT_FP16;
+
+    IntermVal v[65];
+    for (int i = 0; i < 64; ++i) v[i] = e2m1_mul_fp16acc_25(a[i], b[i]);
+    v[64] = fp16_to_intermed25(c);
+    return accumulate_fp16_rne(v, 65);
+}
+
 fp32_t blackwell_dp16a_fp32(const fp16_t* a, const fp16_t* b, size_t len, fp32_t c) {
     static constexpr fp16_t Z = 0x0000u;
     fp32_t acc = c;
@@ -656,6 +736,248 @@ fp16_t blackwell_dp32a_e4m3_fp16(const e4m3_t* a, const e4m3_t* b, size_t len, f
         e4m3_t pa[32] = {}; e4m3_t pb[32] = {};
         for (size_t k = i; k < len; ++k) { pa[k-i] = a[k]; pb[k-i] = b[k]; }
         acc = bw_dp32a_e4m3_fp16_group(pa, pb, acc);
+    }
+    return acc;
+}
+
+fp32_t blackwell_dp64a_e2m1_fp32(const e2m1_t* a, const e2m1_t* b, size_t len, fp32_t c) {
+    fp32_t acc = c;
+    size_t i = 0;
+    for (; i + 64 <= len; i += 64)
+        acc = bw_dp64a_e2m1_fp32_group(a + i, b + i, acc);
+    if (i < len) {
+        e2m1_t pa[64] = {}; e2m1_t pb[64] = {};
+        for (size_t k = i; k < len; ++k) { pa[k-i] = a[k]; pb[k-i] = b[k]; }
+        acc = bw_dp64a_e2m1_fp32_group(pa, pb, acc);
+    }
+    return acc;
+}
+
+fp16_t blackwell_dp64a_e2m1_fp16(const e2m1_t* a, const e2m1_t* b, size_t len, fp16_t c) {
+    fp16_t acc = c;
+    size_t i = 0;
+    for (; i + 64 <= len; i += 64)
+        acc = bw_dp64a_e2m1_fp16_group(a + i, b + i, acc);
+    if (i < len) {
+        e2m1_t pa[64] = {}; e2m1_t pb[64] = {};
+        for (size_t k = i; k < len; ++k) { pa[k-i] = a[k]; pb[k-i] = b[k]; }
+        acc = bw_dp64a_e2m1_fp16_group(pa, pb, acc);
+    }
+    return acc;
+}
+
+static constexpr fp32_t FP32_POS_INF  = 0x7F800000u;
+static constexpr fp32_t FP32_NEG_INF  = 0xFF800000u;
+
+struct Interm35 {
+    enum Kind { ZERO, NORMAL, INF, NAN_VAL } kind = ZERO;
+    bool     sign = false;
+    int32_t  E    = 0;
+    uint64_t M    = 0;
+};
+
+static void decode_scale_e8(uint8_t val,
+                             bool& is_nan, bool& is_zero,
+                             uint32_t& Ma, int& Ea)
+{
+    is_nan  = (val == 0xFF);
+    is_zero = (val == 0x00);
+    Ma = 1;
+    Ea = (int)val - 127;
+}
+
+static void decode_scale_ue4m3(uint8_t val,
+                                bool& is_nan, bool& is_zero,
+                                uint32_t& Ma, int& Ea)
+{
+    is_nan  = (val == 0x7F || val == 0xFF);
+    is_zero = ((val & 0x7F) == 0);
+    uint8_t body = val & 0x7F;
+    int exp_f  = body >> 3;
+    int mant_f = body & 0x7;
+    if (exp_f == 0) { Ma = mant_f; Ea = -9; }
+    else            { Ma = 8 | mant_f; Ea = exp_f - 10; }
+}
+
+static Interm35 fp32_to_interm35(fp32_t c)
+{
+    Interm35 r{};
+    r.sign = fp32_sign(c);
+    int      E  = fp32_exp(c);
+    uint32_t Mf = fp32_mant(c);
+    if (E == 255) {
+        r.kind = (Mf == 0) ? Interm35::INF : Interm35::NAN_VAL;
+        return r;
+    }
+    if (E == 0) {
+        if (Mf == 0) { r.kind = Interm35::ZERO; return r; }
+        r.kind = Interm35::NORMAL;
+        r.E    = 0;
+        r.M    = (uint64_t)Mf << 12;
+        return r;
+    }
+    r.kind = Interm35::NORMAL;
+    r.E    = E;
+    r.M    = ((uint64_t)1 << 34) | ((uint64_t)Mf << 11);
+    return r;
+}
+
+static Interm35 block_to_interm35(const e2m1_t* a, const e2m1_t* b,
+                                   size_t N,
+                                   uint8_t sa, uint8_t sb,
+                                   bool is_e8)
+{
+    Interm35 r{};
+
+    int64_t sum_P = 0;
+    for (size_t i = 0; i < N; ++i) {
+        if (e2m1_is_zero(a[i]) || e2m1_is_zero(b[i])) continue;
+        E2M1Norm na = decode_e2m1(a[i]);
+        E2M1Norm nb = decode_e2m1(b[i]);
+        int exp_sum = na.exp + nb.exp;
+        int shift   = exp_sum + 4;
+        int64_t term = (int64_t)(na.sig * nb.sig) << shift;
+        if (na.sign != nb.sign) sum_P -= term;
+        else                    sum_P += term;
+    }
+    if (sum_P == 0) { r.kind = Interm35::ZERO; return r; }
+
+    bool     is_nan_a, is_zero_a, is_nan_b, is_zero_b;
+    uint32_t Ma, Mb; int Ea, Eb;
+    if (is_e8) {
+        decode_scale_e8   (sa, is_nan_a, is_zero_a, Ma, Ea);
+        decode_scale_e8   (sb, is_nan_b, is_zero_b, Mb, Eb);
+    } else {
+        decode_scale_ue4m3(sa, is_nan_a, is_zero_a, Ma, Ea);
+        decode_scale_ue4m3(sb, is_nan_b, is_zero_b, Mb, Eb);
+    }
+    if (is_nan_a || is_nan_b)   { r.kind = Interm35::NAN_VAL; return r; }
+    if (is_zero_a || is_zero_b) { r.kind = Interm35::ZERO;    return r; }
+
+    bool     blk_sign  = (sum_P < 0);
+    uint64_t abs_P     = blk_sign ? (uint64_t)(-sum_P) : (uint64_t)sum_P;
+    uint64_t sig_total = abs_P * (uint64_t)Ma * (uint64_t)Mb;
+    if (sig_total == 0) { r.kind = Interm35::ZERO; return r; }
+
+    int exp_total = Ea + Eb - 6;
+
+    int lead  = 63 - __builtin_clzll(sig_total);
+    int sft   = 34 - lead;
+    uint64_t M35 = (sft >= 0) ? (sig_total << sft) : (sig_total >> (-sft));
+    int E35 = exp_total + lead + 127;
+
+    r.sign = blk_sign;
+    if (E35 >= 255) {
+        r.kind = Interm35::INF;
+    } else {
+        r.kind = Interm35::NORMAL;
+        r.E    = E35;
+        r.M    = M35;
+    }
+    return r;
+}
+
+static fp32_t accumulate_interm35_fp32(const Interm35* vals, int K)
+{
+    bool has_nan = false, has_pos_inf = false, has_neg_inf = false;
+    for (int i = 0; i < K; ++i) {
+        if (vals[i].kind == Interm35::NAN_VAL) { has_nan = true; continue; }
+        if (vals[i].kind == Interm35::INF) {
+            if (vals[i].sign) has_neg_inf = true;
+            else              has_pos_inf = true;
+        }
+    }
+    if (has_nan || (has_pos_inf && has_neg_inf)) return NAN_OUT_FP32;
+    if (has_pos_inf) return FP32_POS_INF;
+    if (has_neg_inf) return FP32_NEG_INF;
+
+    int max_E = INT32_MIN;
+    for (int i = 0; i < K; ++i)
+        if (vals[i].kind == Interm35::NORMAL && vals[i].E > max_E)
+            max_E = vals[i].E;
+    if (max_E == INT32_MIN) return 0u;
+    int64_t accum_M = 0;
+    for (int i = 0; i < K; ++i) {
+        if (vals[i].kind != Interm35::NORMAL) continue;
+        int      shift      = max_E - vals[i].E;
+        uint64_t aligned_M  = (shift < 64) ? (vals[i].M >> shift) : 0;
+        if (vals[i].sign) accum_M -= (int64_t)aligned_M;
+        else              accum_M += (int64_t)aligned_M;
+    }
+    if (accum_M == 0) return 0u;
+
+    bool     final_sign = (accum_M < 0);
+    uint64_t final_abs  = final_sign ? (uint64_t)(-accum_M) : (uint64_t)accum_M;
+    int     lead     = 63 - __builtin_clzll(final_abs);
+    int32_t E_out   = max_E + lead - 34;
+
+    uint32_t mant23;
+    if      (lead >= 23) mant23 = (uint32_t)(final_abs >> (lead - 23)) & 0x7FFFFFu;
+    else                 mant23 = (uint32_t)(final_abs << (23 - lead)) & 0x7FFFFFu;
+
+    uint32_t sign_bit = final_sign ? 0x80000000u : 0u;
+
+    if (E_out >= 255) return sign_bit | 0x7F800000u;
+    if (E_out <= 0) {
+        int shift2 = 1 - E_out;
+        if (shift2 > 24) return sign_bit;
+        uint32_t sub_sig  = (1u << 23) | mant23;
+        uint32_t sub_mant = sub_sig >> shift2;
+        return sign_bit | sub_mant;
+    }
+    return sign_bit | ((uint32_t)E_out << 23) | mant23;
+}
+
+fp32_t blackwell_mxfp4_e2m1_e8_fp32(const e2m1_t*  a,  const e2m1_t*  b,
+                                      const uint8_t* sa, const uint8_t* sb,
+                                      size_t len, fp32_t c)
+{
+    fp32_t acc = c;
+    size_t i = 0, g = 0;
+    for (; i + 64 <= len; i += 64, g += 2) {
+        Interm35 vals[3];
+        vals[0] = block_to_interm35(a+i,    b+i,    32, sa[g],   sb[g],   true);
+        vals[1] = block_to_interm35(a+i+32, b+i+32, 32, sa[g+1], sb[g+1], true);
+        vals[2] = fp32_to_interm35(acc);
+        acc = accumulate_interm35_fp32(vals, 3);
+    }
+    if (i < len) {
+        e2m1_t pa[64] = {}, pb[64] = {};
+        for (size_t k = i; k < len; ++k) { pa[k-i] = a[k]; pb[k-i] = b[k]; }
+        Interm35 vals[3];
+        vals[0] = block_to_interm35(pa,    pb,    32, sa[g],   sb[g],   true);
+        vals[1] = block_to_interm35(pa+32, pb+32, 32, sa[g+1], sb[g+1], true);
+        vals[2] = fp32_to_interm35(acc);
+        acc = accumulate_interm35_fp32(vals, 3);
+    }
+    return acc;
+}
+
+fp32_t blackwell_nvfp4_e2m1_ue4m3_fp32(const e2m1_t*  a,  const e2m1_t*  b,
+                                         const uint8_t* sa, const uint8_t* sb,
+                                         size_t len, fp32_t c)
+{
+    fp32_t acc = c;
+    size_t i = 0, g = 0;
+    for (; i + 64 <= len; i += 64, g += 4) {
+        Interm35 vals[5];
+        vals[0] = block_to_interm35(a+i,    b+i,    16, sa[g],   sb[g],   false);
+        vals[1] = block_to_interm35(a+i+16, b+i+16, 16, sa[g+1], sb[g+1], false);
+        vals[2] = block_to_interm35(a+i+32, b+i+32, 16, sa[g+2], sb[g+2], false);
+        vals[3] = block_to_interm35(a+i+48, b+i+48, 16, sa[g+3], sb[g+3], false);
+        vals[4] = fp32_to_interm35(acc);
+        acc = accumulate_interm35_fp32(vals, 5);
+    }
+    if (i < len) {
+        e2m1_t pa[64] = {}, pb[64] = {};
+        for (size_t k = i; k < len; ++k) { pa[k-i] = a[k]; pb[k-i] = b[k]; }
+        Interm35 vals[5];
+        vals[0] = block_to_interm35(pa,    pb,    16, sa[g],   sb[g],   false);
+        vals[1] = block_to_interm35(pa+16, pb+16, 16, sa[g+1], sb[g+1], false);
+        vals[2] = block_to_interm35(pa+32, pb+32, 16, sa[g+2], sb[g+2], false);
+        vals[3] = block_to_interm35(pa+48, pb+48, 16, sa[g+3], sb[g+3], false);
+        vals[4] = fp32_to_interm35(acc);
+        acc = accumulate_interm35_fp32(vals, 5);
     }
     return acc;
 }

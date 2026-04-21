@@ -263,7 +263,7 @@ fp16_t hopper_dp32a_e4m3_fp16(const e4m3_t* a, const e4m3_t* b, size_t len, fp16
 
 ---
 
-### Blackwell — DP16A / DP32A /DP64A
+### Blackwell — DP16A / DP32A / DP64A
 
 Blackwell's DP16A is identical to Hopper's (same group size, same 25-bit mantissa). The key upgrade is in DP32A: the internal mantissa precision is raised from Hopper's **13 bits** to **25 bits**, significantly improving FP8 dot-product accuracy. Blackwell also extends **DP32A** to FP4 E2M1 inputs (plain, no scaling), and adds two microscaling variants — **MXFP4** and **NVFP4** — that apply per-block scale factors to FP4 operands using a 64-element group.
 

@@ -202,6 +202,7 @@ CMakeFiles/tensor_sim.dir/main.cpp.obj: G:/tensor_sim/main.cpp \
   G:/msys64/ucrt64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/syslimits.h \
   G:/tensor_sim/include/ampere_tensor.h \
   G:/tensor_sim/include/blackwell_tensor.h \
+  G:/tensor_sim/include/custom_tensor.h \
   G:/tensor_sim/include/fp_utils.h \
   G:/tensor_sim/include/hopper_tensor.h \
   G:/tensor_sim/include/volta_tensor.h
@@ -364,6 +365,8 @@ G:/msys64/ucrt64/include/c++/15.2.0/bits/move.h:
 G:/msys64/ucrt64/include/c++/15.2.0/ext/type_traits.h:
 
 G:/msys64/ucrt64/include/c++/15.2.0/bits/nested_exception.h:
+
+G:/tensor_sim/include/custom_tensor.h:
 
 G:/msys64/ucrt64/include/c++/15.2.0/ctime:
 

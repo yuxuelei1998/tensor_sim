@@ -203,6 +203,7 @@ CMakeFiles/tensor_sim.dir/main.cpp.obj
  G:/msys64/ucrt64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/syslimits.h
  G:/tensor_sim/include/ampere_tensor.h
  G:/tensor_sim/include/blackwell_tensor.h
+ G:/tensor_sim/include/custom_tensor.h
  G:/tensor_sim/include/fp_utils.h
  G:/tensor_sim/include/hopper_tensor.h
  G:/tensor_sim/include/volta_tensor.h

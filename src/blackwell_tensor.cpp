@@ -625,22 +625,22 @@ static fp16_t bw_dp32a_e4m3_fp16_group(const e4m3_t a[32], const e4m3_t b[32], f
     return accumulate_fp16_rne(v, 33);
 }
 
-static fp32_t bw_dp64a_e2m1_fp32_group(const e2m1_t a[64], const e2m1_t b[64], fp32_t c) {
+static fp32_t bw_dp32a_e2m1_fp32_group(const e2m1_t a[32], const e2m1_t b[32], fp32_t c) {
     if (fp32_is_nan(c)) return NAN_OUT_FP32;
 
-    IntermVal v[65];
-    for (int i = 0; i < 64; ++i) v[i] = e2m1_mul_fp32acc_25(a[i], b[i]);
-    v[64] = fp32_to_intermed25(c);
-    return accumulate_fp32_trunc(v, 65);
+    IntermVal v[33];
+    for (int i = 0; i < 32; ++i) v[i] = e2m1_mul_fp32acc_25(a[i], b[i]);
+    v[32] = fp32_to_intermed25(c);
+    return accumulate_fp32_trunc(v, 33);
 }
 
-static fp16_t bw_dp64a_e2m1_fp16_group(const e2m1_t a[64], const e2m1_t b[64], fp16_t c) {
+static fp16_t bw_dp32a_e2m1_fp16_group(const e2m1_t a[32], const e2m1_t b[32], fp16_t c) {
     if (fp16_is_nan(c)) return NAN_OUT_FP16;
 
-    IntermVal v[65];
-    for (int i = 0; i < 64; ++i) v[i] = e2m1_mul_fp16acc_25(a[i], b[i]);
-    v[64] = fp16_to_intermed25(c);
-    return accumulate_fp16_rne(v, 65);
+    IntermVal v[33];
+    for (int i = 0; i < 32; ++i) v[i] = e2m1_mul_fp16acc_25(a[i], b[i]);
+    v[32] = fp16_to_intermed25(c);
+    return accumulate_fp16_rne(v, 33);
 }
 
 fp32_t blackwell_dp16a_fp32(const fp16_t* a, const fp16_t* b, size_t len, fp32_t c) {
@@ -740,28 +740,28 @@ fp16_t blackwell_dp32a_e4m3_fp16(const e4m3_t* a, const e4m3_t* b, size_t len, f
     return acc;
 }
 
-fp32_t blackwell_dp64a_e2m1_fp32(const e2m1_t* a, const e2m1_t* b, size_t len, fp32_t c) {
+fp32_t blackwell_dp32a_e2m1_fp32(const e2m1_t* a, const e2m1_t* b, size_t len, fp32_t c) {
     fp32_t acc = c;
     size_t i = 0;
-    for (; i + 64 <= len; i += 64)
-        acc = bw_dp64a_e2m1_fp32_group(a + i, b + i, acc);
+    for (; i + 32 <= len; i += 32)
+        acc = bw_dp32a_e2m1_fp32_group(a + i, b + i, acc);
     if (i < len) {
-        e2m1_t pa[64] = {}; e2m1_t pb[64] = {};
+        e2m1_t pa[32] = {}; e2m1_t pb[32] = {};
         for (size_t k = i; k < len; ++k) { pa[k-i] = a[k]; pb[k-i] = b[k]; }
-        acc = bw_dp64a_e2m1_fp32_group(pa, pb, acc);
+        acc = bw_dp32a_e2m1_fp32_group(pa, pb, acc);
     }
     return acc;
 }
 
-fp16_t blackwell_dp64a_e2m1_fp16(const e2m1_t* a, const e2m1_t* b, size_t len, fp16_t c) {
+fp16_t blackwell_dp32a_e2m1_fp16(const e2m1_t* a, const e2m1_t* b, size_t len, fp16_t c) {
     fp16_t acc = c;
     size_t i = 0;
-    for (; i + 64 <= len; i += 64)
-        acc = bw_dp64a_e2m1_fp16_group(a + i, b + i, acc);
+    for (; i + 32 <= len; i += 32)
+        acc = bw_dp32a_e2m1_fp16_group(a + i, b + i, acc);
     if (i < len) {
-        e2m1_t pa[64] = {}; e2m1_t pb[64] = {};
+        e2m1_t pa[32] = {}; e2m1_t pb[32] = {};
         for (size_t k = i; k < len; ++k) { pa[k-i] = a[k]; pb[k-i] = b[k]; }
-        acc = bw_dp64a_e2m1_fp16_group(pa, pb, acc);
+        acc = bw_dp32a_e2m1_fp16_group(pa, pb, acc);
     }
     return acc;
 }

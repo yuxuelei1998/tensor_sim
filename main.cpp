@@ -524,12 +524,12 @@ int main() {
             for (size_t i = 0; i < vec_len; ++i) B[i] = static_cast<e2m1_t>(vals[vec_len + i]);
 
             if (c_type == "fp32") {
-                fp32_t result = blackwell_dp64a_e2m1_fp32(A.data(), B.data(), vec_len,
+                fp32_t result = blackwell_dp32a_e2m1_fp32(A.data(), B.data(), vec_len,
                                                            static_cast<fp32_t>(c_raw));
                 fout << ", 0x" << std::uppercase << std::hex
                      << std::setw(8) << std::setfill('0') << result << "\n";
             } else {
-                fp16_t result = blackwell_dp64a_e2m1_fp16(A.data(), B.data(), vec_len,
+                fp16_t result = blackwell_dp32a_e2m1_fp16(A.data(), B.data(), vec_len,
                                                            static_cast<fp16_t>(c_raw));
                 fout << ", 0x" << std::uppercase << std::hex
                      << std::setw(4) << std::setfill('0') << result << "\n";

@@ -320,68 +320,68 @@ static void test_dp32a_e4m3_fp16_chaining() {
     }
 }
 
-static void test_dp64a_e2m1_fp32_basic() {
-    SECTION("DP64A FP32 acc / E2M1 inputs – basic");
+static void test_dp32a_e2m1_fp32_basic() {
+    SECTION("DP32A FP32 acc / E2M1 inputs – basic");
     {
         e2m1_t a[64] = {0}, bv[64] = {0};
         a[0] = 0x2; bv[0] = 0x2;
-        CHECK_EQ_HEX(blackwell_dp64a_e2m1_fp32(a, bv, 64, F_ZERO), f32(1.0f));
+        CHECK_EQ_HEX(blackwell_dp32a_e2m1_fp32(a, bv, 64, F_ZERO), f32(1.0f));
     }
     {
         e2m1_t a[64], bv[64];
         for (int i = 0; i < 64; ++i) { a[i] = 0x2; bv[i] = 0x2; }
-        CHECK_EQ_HEX(blackwell_dp64a_e2m1_fp32(a, bv, 64, F_ZERO), f32(64.0f));
+        CHECK_EQ_HEX(blackwell_dp32a_e2m1_fp32(a, bv, 64, F_ZERO), f32(64.0f));
     }
     {
         e2m1_t a[64], bv[64];
         for (int i = 0; i < 64; ++i) { a[i] = 0x3; bv[i] = 0x3; }
-        CHECK_EQ_HEX(blackwell_dp64a_e2m1_fp32(a, bv, 64, F_ZERO), f32(144.0f));
+        CHECK_EQ_HEX(blackwell_dp32a_e2m1_fp32(a, bv, 64, F_ZERO), f32(144.0f));
     }
 }
 
-static void test_dp64a_e2m1_fp32_subnorm() {
-    SECTION("DP64A FP32 acc / E2M1 inputs – subnormals");
+static void test_dp32a_e2m1_fp32_subnorm() {
+    SECTION("DP32A FP32 acc / E2M1 inputs – subnormals");
     {
         e2m1_t a[64] = {0}, bv[64] = {0};
         a[0] = 0x1; bv[0] = 0x2;
-        CHECK_EQ_HEX(blackwell_dp64a_e2m1_fp32(a, bv, 64, F_ZERO), f32(0.5f));
+        CHECK_EQ_HEX(blackwell_dp32a_e2m1_fp32(a, bv, 64, F_ZERO), f32(0.5f));
     }
     {
         e2m1_t a[64] = {0}, bv[64] = {0};
         a[0] = 0x1; bv[0] = 0x1;
-        CHECK_EQ_HEX(blackwell_dp64a_e2m1_fp32(a, bv, 64, F_ZERO), f32(0.25f));
+        CHECK_EQ_HEX(blackwell_dp32a_e2m1_fp32(a, bv, 64, F_ZERO), f32(0.25f));
     }
 }
 
-static void test_dp64a_e2m1_fp32_chaining() {
-    SECTION("DP64A FP32 acc / E2M1 inputs – chaining");
+static void test_dp32a_e2m1_fp32_chaining() {
+    SECTION("DP32A FP32 acc / E2M1 inputs – chaining");
     {
         e2m1_t a[65], bv[65];
         for (int i = 0; i < 65; ++i) { a[i] = 0x2; bv[i] = 0x2; }
-        CHECK_EQ_HEX(blackwell_dp64a_e2m1_fp32(a, bv, 65, F_ZERO), f32(65.0f));
+        CHECK_EQ_HEX(blackwell_dp32a_e2m1_fp32(a, bv, 65, F_ZERO), f32(65.0f));
     }
 }
 
-static void test_dp64a_e2m1_fp16_basic() {
-    SECTION("DP64A FP16 acc / E2M1 inputs – basic");
+static void test_dp32a_e2m1_fp16_basic() {
+    SECTION("DP32A FP16 acc / E2M1 inputs – basic");
     {
         e2m1_t a[64] = {0}, bv[64] = {0};
         a[0] = 0x2; bv[0] = 0x2;
-        CHECK_EQ_HEX(blackwell_dp64a_e2m1_fp16(a, bv, 64, H_ZERO), h(1.0f));
+        CHECK_EQ_HEX(blackwell_dp32a_e2m1_fp16(a, bv, 64, H_ZERO), h(1.0f));
     }
     {
         e2m1_t a[64], bv[64];
         for (int i = 0; i < 64; ++i) { a[i] = 0x2; bv[i] = 0x2; }
-        CHECK_EQ_HEX(blackwell_dp64a_e2m1_fp16(a, bv, 64, H_ZERO), h(64.0f));
+        CHECK_EQ_HEX(blackwell_dp32a_e2m1_fp16(a, bv, 64, H_ZERO), h(64.0f));
     }
 }
 
-static void test_dp64a_e2m1_fp16_chaining() {
-    SECTION("DP64A FP16 acc / E2M1 inputs – chaining");
+static void test_dp32a_e2m1_fp16_chaining() {
+    SECTION("DP32A FP16 acc / E2M1 inputs – chaining");
     {
         e2m1_t a[65], bv[65];
         for (int i = 0; i < 65; ++i) { a[i] = 0x2; bv[i] = 0x2; }
-        CHECK_EQ_HEX(blackwell_dp64a_e2m1_fp16(a, bv, 65, H_ZERO), h(65.0f));
+        CHECK_EQ_HEX(blackwell_dp32a_e2m1_fp16(a, bv, 65, H_ZERO), h(65.0f));
     }
 }
 
@@ -409,11 +409,11 @@ int main() {
     test_dp32a_e4m3_fp16_specials();
     test_dp32a_e4m3_fp16_chaining();
 
-    test_dp64a_e2m1_fp32_basic();
-    test_dp64a_e2m1_fp32_subnorm();
-    test_dp64a_e2m1_fp32_chaining();
-    test_dp64a_e2m1_fp16_basic();
-    test_dp64a_e2m1_fp16_chaining();
+    test_dp32a_e2m1_fp32_basic();
+    test_dp32a_e2m1_fp32_subnorm();
+    test_dp32a_e2m1_fp32_chaining();
+    test_dp32a_e2m1_fp16_basic();
+    test_dp32a_e2m1_fp16_chaining();
 
     std::printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail ? 1 : 0;

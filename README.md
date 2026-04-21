@@ -132,10 +132,8 @@ After alignment, the values are summed as integers. The result is normalized in 
 **Public API**
 
 ```cpp
-// FP32 accumulator
 fp32_t volta_dp4a_fp32(const fp16_t* a, const fp16_t* b, size_t len, fp32_t c);
 
-// FP16 accumulator
 fp16_t volta_dp4a_fp16(const fp16_t* a, const fp16_t* b, size_t len, fp16_t c);
 ```
 
@@ -184,13 +182,10 @@ All 9 intermediate values (8 products + C) are aligned to $e_{\max}$:
 **Public API**
 
 ```cpp
-// FP16 inputs, FP32 accumulator
 fp32_t ampere_dp8a_fp32(const fp16_t* a, const fp16_t* b, size_t len, fp32_t c);
 
-// FP16 inputs, FP16 accumulator
 fp16_t ampere_dp8a_fp16(const fp16_t* a, const fp16_t* b, size_t len, fp16_t c);
 
-// BF16 inputs, FP32 accumulator
 fp32_t ampere_dp8a_bf16(const bf16_t* a, const bf16_t* b, size_t len, fp32_t c);
 ```
 
@@ -371,8 +366,6 @@ Products and scale factors are accumulated using a **35-bit** mantissa intermedi
 **Public API**
 
 ```cpp
-// sa[i] and sb[i] are UE8M0 scale bytes; one per 32-element block.
-// For a 64-element vector: 2 scale bytes each for A and B.
 fp32_t blackwell_mxfp4_e2m1_e8_fp32(const e2m1_t* a, const e2m1_t* b,
                                       const uint8_t* sa, const uint8_t* sb,
                                       size_t len, fp32_t c);
@@ -401,8 +394,6 @@ Same 35-bit mantissa intermediate as MXFP4 (`Interm35`).
 **Public API**
 
 ```cpp
-// sa[i] and sb[i] are UE4M3 scale bytes; one per 16-element block.
-// For a 64-element vector: 4 scale bytes each for A and B.
 fp32_t blackwell_nvfp4_e2m1_ue4m3_fp32(const e2m1_t* a, const e2m1_t* b,
                                          const uint8_t* sa, const uint8_t* sb,
                                          size_t len, fp32_t c);
@@ -445,8 +436,6 @@ Scale factors are applied to each element before the dot-product accumulation.
 **Public API**
 
 ```cpp
-// All precisions are passed as raw uint32_t bit patterns;
-// scale arrays are uint8_t (pass nullptr / empty when use_scale = false).
 uint32_t custom_dot_product(const uint32_t* a, const uint32_t* b,
                              const uint8_t* sa, const uint8_t* sb,
                              size_t len, uint32_t c,
@@ -464,13 +453,13 @@ struct CustomConfig {
 
     ABPrec    ab_prec    = ABPrec::FP16;
     CDPrec    cd_prec    = CDPrec::FP32;
-    int       dp_width   = 16;     // n: elements per group
-    int       mant_width = 25;     // w: internal mantissa bits
+    int       dp_width   = 16;
+    int       mant_width = 25;
     RoundMode round_mode = RoundMode::RTZ;
     bool      use_scale  = false;
-    int       scale_group = 16;    // x: elements per scale factor
+    int       scale_group = 16;
     ScaleType scale_type = ScaleType::UE8M0;
-    int       vec_len    = 0;      // required when use_scale = true
+    int       vec_len    = 0;
 };
 ```
 
@@ -549,10 +538,10 @@ Build artifacts:
 
 ```bash
 cd build
-./test_volta.exe     # expected: 74 passed, 0 failed
-./test_ampere.exe    # expected: 50 passed, 0 failed
-./test_hopper.exe    # expected: 97 passed, 0 failed
-./test_blackwell.exe # expected: 81 passed, 0 failed
+./test_volta.exe
+./test_ampere.exe
+./test_hopper.exe
+./test_blackwell.exe
 ```
 
 Test coverage (all architectures):

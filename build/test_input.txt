@@ -1,0 +1,9 @@
+5
+1
+1
+4
+25
+1
+0
+G:/tensor_sim/tests/test_custom.txt
+G:/tensor_sim/results/test_custom_fp16_fp32_n4_w25_rtz.txt

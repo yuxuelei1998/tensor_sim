@@ -99,6 +99,7 @@ tensor_sim.exe: libvolta_sim.a
 tensor_sim.exe: libampere_sim.a
 tensor_sim.exe: libhopper_sim.a
 tensor_sim.exe: libblackwell_sim.a
+tensor_sim.exe: libcustom_sim.a
 tensor_sim.exe: CMakeFiles/tensor_sim.dir/linkLibs.rsp
 tensor_sim.exe: CMakeFiles/tensor_sim.dir/objects1.rsp
 tensor_sim.exe: CMakeFiles/tensor_sim.dir/link.txt

@@ -14,6 +14,7 @@ TensorSim is a **bit-accurate C++ simulator** for NVIDIA GPU Tensor Cores. It re
   - [Ampere — DP8A](#ampere--dp8a)
   - [Hopper — DP16A / DP32A](#hopper--dp16a--dp32a)
   - [Blackwell — DP16A / DP32A](#blackwell--dp16a--dp32a)
+  - [Custom — Fully Configurable DPnA](#custom--fully-configurable-dpna)
 - [Project Structure](#project-structure)
 - [Building](#building)
 - [Running Tests](#running-tests)
@@ -45,6 +46,7 @@ TensorSim is a **bit-accurate C++ simulator** for NVIDIA GPU Tensor Cores. It re
 | Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E5M2 | FP16 | RNE |
 | Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP32 | TC-Truncation |
 | Blackwell | DP32A (32-point dot-product accumulate)| 32 | FP8 E4M3 | FP16 | RNE |
+| Custom    | DPnA (configurable n-point dot-product)| n  | FP16/BF16/FP8/FP4 | FP32/FP16 | RTZ or RNE |
 
 ---
 
@@ -57,7 +59,7 @@ TensorSim is a **bit-accurate C++ simulator** for NVIDIA GPU Tensor Cores. It re
 | BF16       | 16   | 1    | 8 (bias 127)    |  7       | ≈ 3.39 × 10³⁸    | Yes |
 | FP8 E5M2   |  8   | 1    | 5 (bias 15)     |  2       | 57344             | Yes |
 | FP8 E4M3   |  8   | 1    | 4 (bias 7)      |  3       | 448               | NaN only (no Inf) |
-| NVFP4 E2M1 |  4   | 1    | 2 (bias 1)      |  1       | 6.0               | None (planned) |
+| NVFP4 E2M1 |  4   | 1    | 2 (bias 1)      |  1       | 6.0               | None |
 
 > **FP8 E4M3 special convention (NVIDIA)**: only `0x7F` (`+NaN`) and `0xFF` (`−NaN`) encode NaN; there is no Inf encoding; maximum normal value is 448.
 
@@ -295,6 +297,72 @@ fp16_t blackwell_dp32a_e4m3_fp16(const e4m3_t* a, const e4m3_t* b, size_t len, f
 
 ---
 
+### Custom — Fully Configurable DPnA
+
+**Operation**
+
+$$D = \sum_{i=0}^{n-1} A_i \times B_i + C$$
+
+where $n$ is user-specified (any positive integer).
+
+**Configuration Parameters**
+
+| Parameter | Options | Description |
+|-----------|---------|-------------|
+| A/B precision | FP16, BF16, FP8 E5M2, FP8 E4M3, FP4 E2M1 | Input element format |
+| C/D precision | FP32, FP16 | Accumulator format |
+| DP width `n` | any ≥ 1 | Elements per dot-product group |
+| Mantissa bits `w` | 1–52 | Internal significand width (w+1 bits total) |
+| Rounding mode | RTZ (truncate), RNE | Final rounding to output format |
+| Scaling | optional | Per-group scale factors for A and B |
+| Scale group size `x` | any ≥ 1 | Elements sharing one scale factor |
+| Scale format | UE8M0, UE4M3 | Scale factor encoding |
+
+The discard threshold follows the same rule as the fixed architectures: a value right-shifted by $\geq w+1$ bits is discarded entirely.
+
+**Scaling**
+
+When scaling is enabled, each group of `x` consecutive elements shares a single scale factor:
+
+- **UE8M0** — 8-bit unsigned integer exponent (used in MXFP microscaling); the effective multiplier is $2^{\text{byte}}$.
+- **UE4M3** — 7-bit unsigned float with 4-bit exponent and 3-bit mantissa (used in NVFP); the effective multiplier is the decoded float value.
+
+Scale factors are applied to each element before the dot-product accumulation.
+
+**Public API**
+
+```cpp
+// All precisions are passed as raw uint32_t bit patterns;
+// scale arrays are uint8_t (pass nullptr / empty when use_scale = false).
+uint32_t custom_dot_product(const uint32_t* a, const uint32_t* b,
+                             const uint8_t* sa, const uint8_t* sb,
+                             size_t len, uint32_t c,
+                             const CustomConfig& cfg);
+```
+
+**`CustomConfig` struct** (defined in `include/custom_tensor.h`):
+
+```cpp
+struct CustomConfig {
+    enum class ABPrec    : uint8_t { FP16, BF16, FP8_E5M2, FP8_E4M3, FP4_E2M1 };
+    enum class CDPrec    : uint8_t { FP32, FP16 };
+    enum class RoundMode : uint8_t { RNE, RTZ };
+    enum class ScaleType : uint8_t { UE8M0, UE4M3 };
+
+    ABPrec    ab_prec    = ABPrec::FP16;
+    CDPrec    cd_prec    = CDPrec::FP32;
+    int       dp_width   = 16;     // n: elements per group
+    int       mant_width = 25;     // w: internal mantissa bits
+    RoundMode round_mode = RoundMode::RTZ;
+    bool      use_scale  = false;
+    int       scale_group = 16;    // x: elements per scale factor
+    ScaleType scale_type = ScaleType::UE8M0;
+    int       vec_len    = 0;      // required when use_scale = true
+};
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -302,16 +370,18 @@ tensor_sim/
 ├── CMakeLists.txt
 ├── main.cpp                       # Interactive CLI entry point (tensor_sim)
 ├── include/
-│   ├── fp_utils.h                 # Bit-manipulation utilities for FP16 / BF16 / FP8 / FP32
+│   ├── fp_utils.h                 # Bit-manipulation utilities for FP16 / BF16 / FP8 / FP4 / FP32
 │   ├── volta_tensor.h             # Volta DP4A declarations
 │   ├── ampere_tensor.h            # Ampere DP8A declarations
 │   ├── hopper_tensor.h            # Hopper DP16A / DP32A declarations
-│   └── blackwell_tensor.h         # Blackwell DP16A / DP32A declarations
+│   ├── blackwell_tensor.h         # Blackwell DP16A / DP32A declarations
+│   └── custom_tensor.h            # Custom DPnA declarations and CustomConfig struct
 ├── src/
 │   ├── volta_tensor.cpp           # Volta DP4A implementation
 │   ├── ampere_tensor.cpp          # Ampere DP8A implementation
 │   ├── hopper_tensor.cpp          # Hopper DP16A / DP32A implementation
-│   └── blackwell_tensor.cpp       # Blackwell DP16A / DP32A implementation
+│   ├── blackwell_tensor.cpp       # Blackwell DP16A / DP32A implementation
+│   └── custom_tensor.cpp          # Custom DPnA implementation
 ├── tests/
 │   ├── test_volta.cpp             # Volta unit tests
 │   ├── test_ampere.cpp            # Ampere unit tests
@@ -348,11 +418,12 @@ Build artifacts:
 | `libampere_sim.a`   | Ampere static library |
 | `libhopper_sim.a`   | Hopper static library |
 | `libblackwell_sim.a`| Blackwell static library |
+| `libcustom_sim.a`   | Custom DPnA static library |
 | `test_volta.exe`    | Volta unit test executable |
 | `test_ampere.exe`   | Ampere unit test executable |
 | `test_hopper.exe`   | Hopper unit test executable |
 | `test_blackwell.exe`| Blackwell unit test executable |
-| `tensor_sim.exe`   | Interactive simulator |
+| `tensor_sim.exe`    | Interactive simulator |
 
 ---
 
@@ -380,7 +451,9 @@ Test coverage (all architectures):
 
 ## Interactive CLI Tool
 
-Run `tensor_sim.exe` and follow the prompts to select architecture, accumulator precision, and A/B vector precision. The program reads the corresponding test vector file, appends the simulation results, and writes output to the `results/` directory.
+Run `tensor_sim.exe` and follow the prompts. For architectures 1–4 (Volta / Ampere / Hopper / Blackwell) the program reads the corresponding test vector file and writes results to the `results/` directory. For architecture 5 (Custom) the prompts collect all configuration parameters and file paths interactively.
+
+**Fixed-architecture session example (Hopper, FP32 accumulator, FP16 inputs):**
 
 ```
 === Tensor Core Simulator ===
@@ -390,7 +463,8 @@ Select architecture:
   2. Ampere
   3. Hopper
   4. Blackwell
-Enter choice (1-4): 3
+  5. Custom (fully configurable)
+Enter choice (1-5): 3
 
 Select accumulator (C) precision:
   1. FP32
@@ -402,11 +476,56 @@ Select A/B vector precision:
   2. BF16
   3. FP8_E5M2
   4. FP8_E4M3
-  5. NVFP4_E2M1
-Enter choice (1-5): 3
+Enter choice (1-4): 1
 ```
 
-**Currently implemented combinations:**
+**Custom-architecture session example:**
+
+```
+=== Tensor Core Simulator ===
+
+Select architecture:
+  1. Volta
+  2. Ampere
+  3. Hopper
+  4. Blackwell
+  5. Custom (fully configurable)
+Enter choice (1-5): 5
+
+Select A/B input precision:
+  1. FP16
+  2. BF16
+  3. FP8 E5M2
+  4. FP8 E4M3
+  5. FP4 E2M1
+Enter choice (1-5): 3
+
+Select C/D accumulator precision:
+  1. FP32
+  2. FP16
+Enter choice (1-2): 1
+
+Dot-product unit width n (e.g. 4, 8, 16, 32, 64): 32
+Intermediate mantissa bits w (1-52): 20
+
+Rounding mode:
+  1. RTZ (round toward zero / truncate)
+  2. RNE (round to nearest even)
+Enter choice (1-2): 2
+
+Use scaling factors for A/B? (0=no, 1=yes): 1
+Elements per scale group x: 16
+Scale factor format:
+  1. UE8M0 (8-bit unsigned exponent, used in MXFP)
+  2. UE4M3 (7-bit unsigned float, used in NVFP)
+Enter choice (1-2): 1
+Vector length per test line (A/B elements per line): 32
+
+Test input file path: tests/my_custom.txt
+Result output file path: results/my_custom_out.txt
+```
+
+**Fixed-architecture combinations (choices 1–4):**
 
 | Architecture | A/B Precision | Accumulator | Input file | Output file |
 |--------------|--------------|-------------|------------|-------------|
@@ -429,5 +548,42 @@ Enter choice (1-5): 3
 | Blackwell | FP8 E5M2 | FP16 | `tests/test_fp16.fp8_e5m2.txt` | `results/test_fp16.fp8_e5m2_Blackwell.txt` |
 | Blackwell | FP8 E4M3 | FP32 | `tests/test_fp32.fp8_e4m3.txt` | `results/test_fp32.fp8_e4m3_Blackwell.txt` |
 | Blackwell | FP8 E4M3 | FP16 | `tests/test_fp16.fp8_e4m3.txt` | `results/test_fp16.fp8_e4m3_Blackwell.txt` |
+
+**Custom architecture (choice 5):** input file path and output file path are specified interactively. Any combination of supported precisions, DP width, mantissa bits, rounding mode, and optional scaling is accepted.
+
+---
+
+## Test Vector File Format
+
+Each line is one test case. Fields are comma-separated hex values. Blank lines are ignored.
+
+**Without scaling (fixed architectures and custom without scaling):**
+
+```
+A[0], A[1], ..., A[L-1], B[0], B[1], ..., B[L-1], C
+```
+
+- `A` and `B` are element bit-patterns; width depends on the input precision (16-bit for FP16/BF16, 8-bit for FP8, 4-bit for FP4 packed as 8-bit).
+- `C` is the accumulator bit-pattern (32-bit for FP32, 16-bit for FP16).
+- `L` is the total vector length (all elements; groups of `n` are formed automatically with zero-padding).
+
+**With scaling (custom architecture, `use_scale = true`):**
+
+```
+A[0], ..., A[L-1], B[0], ..., B[L-1], SA[0], ..., SA[K-1], SB[0], ..., SB[K-1], C
+```
+
+- `SA` and `SB` are scale factor bytes (one per group of `x` elements); `K = ceil(L / x)`.
+- Scale bytes are UE8M0 or UE4M3 values, written as 8-bit hex.
+
+**Example line (FP16 inputs, FP32 accumulator, 16 elements per vector):**
+
+```
+0x3C00, 0x3C00, ..., 0x3C00,   ← 16 A values (1.0 in FP16)
+0x3C00, 0x3C00, ..., 0x3C00,   ← 16 B values (1.0 in FP16)
+0x00000000                      ← C = 0.0 in FP32
+```
+
+The simulator appends the computed result `D` as a hex field to the input line, e.g. `, 0x3F800000` for FP32 or `, 0x3C00` for FP16.
 
 ---

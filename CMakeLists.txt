@@ -30,6 +30,11 @@ add_library(blackwell_sim
 )
 target_include_directories(blackwell_sim PUBLIC include)
 
+add_library(custom_sim
+    src/custom_tensor.cpp
+)
+target_include_directories(custom_sim PUBLIC include)
+
 add_executable(test_volta
     tests/test_volta.cpp
 )
@@ -57,7 +62,7 @@ target_include_directories(test_blackwell PRIVATE include)
 add_executable(tensor_sim
     main.cpp
 )
-target_link_libraries(tensor_sim PRIVATE volta_sim ampere_sim hopper_sim blackwell_sim)
+target_link_libraries(tensor_sim PRIVATE volta_sim ampere_sim hopper_sim blackwell_sim custom_sim)
 target_include_directories(tensor_sim PRIVATE include)
 target_compile_definitions(tensor_sim PRIVATE
     TENSOR_SIM_DIR="${CMAKE_CURRENT_SOURCE_DIR}"

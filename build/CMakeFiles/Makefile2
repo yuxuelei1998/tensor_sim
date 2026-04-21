@@ -66,6 +66,7 @@ all: CMakeFiles/volta_sim.dir/all
 all: CMakeFiles/ampere_sim.dir/all
 all: CMakeFiles/hopper_sim.dir/all
 all: CMakeFiles/blackwell_sim.dir/all
+all: CMakeFiles/custom_sim.dir/all
 all: CMakeFiles/test_volta.dir/all
 all: CMakeFiles/test_ampere.dir/all
 all: CMakeFiles/test_hopper.dir/all
@@ -78,6 +79,7 @@ codegen: CMakeFiles/volta_sim.dir/codegen
 codegen: CMakeFiles/ampere_sim.dir/codegen
 codegen: CMakeFiles/hopper_sim.dir/codegen
 codegen: CMakeFiles/blackwell_sim.dir/codegen
+codegen: CMakeFiles/custom_sim.dir/codegen
 codegen: CMakeFiles/test_volta.dir/codegen
 codegen: CMakeFiles/test_ampere.dir/codegen
 codegen: CMakeFiles/test_hopper.dir/codegen
@@ -94,6 +96,7 @@ clean: CMakeFiles/volta_sim.dir/clean
 clean: CMakeFiles/ampere_sim.dir/clean
 clean: CMakeFiles/hopper_sim.dir/clean
 clean: CMakeFiles/blackwell_sim.dir/clean
+clean: CMakeFiles/custom_sim.dir/clean
 clean: CMakeFiles/test_volta.dir/clean
 clean: CMakeFiles/test_ampere.dir/clean
 clean: CMakeFiles/test_hopper.dir/clean
@@ -108,7 +111,7 @@ clean: CMakeFiles/tensor_sim.dir/clean
 CMakeFiles/volta_sim.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\volta_sim.dir\build.make CMakeFiles/volta_sim.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\volta_sim.dir\build.make CMakeFiles/volta_sim.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=17,18 "Built target volta_sim"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=19,20 "Built target volta_sim"
 .PHONY : CMakeFiles/volta_sim.dir/all
 
 # Build rule for subdir invocation for target.
@@ -125,7 +128,7 @@ volta_sim: CMakeFiles/volta_sim.dir/rule
 # codegen rule for target.
 CMakeFiles/volta_sim.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\volta_sim.dir\build.make CMakeFiles/volta_sim.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=17,18 "Finished codegen for target volta_sim"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=19,20 "Finished codegen for target volta_sim"
 .PHONY : CMakeFiles/volta_sim.dir/codegen
 
 # clean rule for target.
@@ -172,7 +175,7 @@ CMakeFiles/ampere_sim.dir/clean:
 CMakeFiles/hopper_sim.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\hopper_sim.dir\build.make CMakeFiles/hopper_sim.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\hopper_sim.dir\build.make CMakeFiles/hopper_sim.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=5,6 "Built target hopper_sim"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=7,8 "Built target hopper_sim"
 .PHONY : CMakeFiles/hopper_sim.dir/all
 
 # Build rule for subdir invocation for target.
@@ -189,7 +192,7 @@ hopper_sim: CMakeFiles/hopper_sim.dir/rule
 # codegen rule for target.
 CMakeFiles/hopper_sim.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\hopper_sim.dir\build.make CMakeFiles/hopper_sim.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=5,6 "Finished codegen for target hopper_sim"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=7,8 "Finished codegen for target hopper_sim"
 .PHONY : CMakeFiles/hopper_sim.dir/codegen
 
 # clean rule for target.
@@ -230,13 +233,45 @@ CMakeFiles/blackwell_sim.dir/clean:
 .PHONY : CMakeFiles/blackwell_sim.dir/clean
 
 #=============================================================================
+# Target rules for target CMakeFiles/custom_sim.dir
+
+# All Build rule for target.
+CMakeFiles/custom_sim.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\custom_sim.dir\build.make CMakeFiles/custom_sim.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\custom_sim.dir\build.make CMakeFiles/custom_sim.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=5,6 "Built target custom_sim"
+.PHONY : CMakeFiles/custom_sim.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/custom_sim.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start G:\tensor_sim\build\CMakeFiles 2
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 CMakeFiles/custom_sim.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start G:\tensor_sim\build\CMakeFiles 0
+.PHONY : CMakeFiles/custom_sim.dir/rule
+
+# Convenience name for target.
+custom_sim: CMakeFiles/custom_sim.dir/rule
+.PHONY : custom_sim
+
+# codegen rule for target.
+CMakeFiles/custom_sim.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\custom_sim.dir\build.make CMakeFiles/custom_sim.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=5,6 "Finished codegen for target custom_sim"
+.PHONY : CMakeFiles/custom_sim.dir/codegen
+
+# clean rule for target.
+CMakeFiles/custom_sim.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\custom_sim.dir\build.make CMakeFiles/custom_sim.dir/clean
+.PHONY : CMakeFiles/custom_sim.dir/clean
+
+#=============================================================================
 # Target rules for target CMakeFiles/test_volta.dir
 
 # All Build rule for target.
 CMakeFiles/test_volta.dir/all: CMakeFiles/volta_sim.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_volta.dir\build.make CMakeFiles/test_volta.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_volta.dir\build.make CMakeFiles/test_volta.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=15,16 "Built target test_volta"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=17,18 "Built target test_volta"
 .PHONY : CMakeFiles/test_volta.dir/all
 
 # Build rule for subdir invocation for target.
@@ -253,7 +288,7 @@ test_volta: CMakeFiles/test_volta.dir/rule
 # codegen rule for target.
 CMakeFiles/test_volta.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_volta.dir\build.make CMakeFiles/test_volta.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=15,16 "Finished codegen for target test_volta"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=17,18 "Finished codegen for target test_volta"
 .PHONY : CMakeFiles/test_volta.dir/codegen
 
 # clean rule for target.
@@ -268,7 +303,7 @@ CMakeFiles/test_volta.dir/clean:
 CMakeFiles/test_ampere.dir/all: CMakeFiles/ampere_sim.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_ampere.dir\build.make CMakeFiles/test_ampere.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_ampere.dir\build.make CMakeFiles/test_ampere.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=9,10 "Built target test_ampere"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=11,12 "Built target test_ampere"
 .PHONY : CMakeFiles/test_ampere.dir/all
 
 # Build rule for subdir invocation for target.
@@ -285,7 +320,7 @@ test_ampere: CMakeFiles/test_ampere.dir/rule
 # codegen rule for target.
 CMakeFiles/test_ampere.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_ampere.dir\build.make CMakeFiles/test_ampere.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=9,10 "Finished codegen for target test_ampere"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=11,12 "Finished codegen for target test_ampere"
 .PHONY : CMakeFiles/test_ampere.dir/codegen
 
 # clean rule for target.
@@ -300,7 +335,7 @@ CMakeFiles/test_ampere.dir/clean:
 CMakeFiles/test_hopper.dir/all: CMakeFiles/hopper_sim.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_hopper.dir\build.make CMakeFiles/test_hopper.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_hopper.dir\build.make CMakeFiles/test_hopper.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=13,14 "Built target test_hopper"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=15,16 "Built target test_hopper"
 .PHONY : CMakeFiles/test_hopper.dir/all
 
 # Build rule for subdir invocation for target.
@@ -317,7 +352,7 @@ test_hopper: CMakeFiles/test_hopper.dir/rule
 # codegen rule for target.
 CMakeFiles/test_hopper.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_hopper.dir\build.make CMakeFiles/test_hopper.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=13,14 "Finished codegen for target test_hopper"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=15,16 "Finished codegen for target test_hopper"
 .PHONY : CMakeFiles/test_hopper.dir/codegen
 
 # clean rule for target.
@@ -332,7 +367,7 @@ CMakeFiles/test_hopper.dir/clean:
 CMakeFiles/test_blackwell.dir/all: CMakeFiles/blackwell_sim.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_blackwell.dir\build.make CMakeFiles/test_blackwell.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_blackwell.dir\build.make CMakeFiles/test_blackwell.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=11,12 "Built target test_blackwell"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=13,14 "Built target test_blackwell"
 .PHONY : CMakeFiles/test_blackwell.dir/all
 
 # Build rule for subdir invocation for target.
@@ -349,7 +384,7 @@ test_blackwell: CMakeFiles/test_blackwell.dir/rule
 # codegen rule for target.
 CMakeFiles/test_blackwell.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\test_blackwell.dir\build.make CMakeFiles/test_blackwell.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=11,12 "Finished codegen for target test_blackwell"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=13,14 "Finished codegen for target test_blackwell"
 .PHONY : CMakeFiles/test_blackwell.dir/codegen
 
 # clean rule for target.
@@ -361,18 +396,19 @@ CMakeFiles/test_blackwell.dir/clean:
 # Target rules for target CMakeFiles/tensor_sim.dir
 
 # All Build rule for target.
-CMakeFiles/tensor_sim.dir/all: CMakeFiles/blackwell_sim.dir/all
 CMakeFiles/tensor_sim.dir/all: CMakeFiles/hopper_sim.dir/all
+CMakeFiles/tensor_sim.dir/all: CMakeFiles/blackwell_sim.dir/all
 CMakeFiles/tensor_sim.dir/all: CMakeFiles/ampere_sim.dir/all
 CMakeFiles/tensor_sim.dir/all: CMakeFiles/volta_sim.dir/all
+CMakeFiles/tensor_sim.dir/all: CMakeFiles/custom_sim.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\tensor_sim.dir\build.make CMakeFiles/tensor_sim.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\tensor_sim.dir\build.make CMakeFiles/tensor_sim.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=7,8 "Built target tensor_sim"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=9,10 "Built target tensor_sim"
 .PHONY : CMakeFiles/tensor_sim.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/tensor_sim.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start G:\tensor_sim\build\CMakeFiles 10
+	$(CMAKE_COMMAND) -E cmake_progress_start G:\tensor_sim\build\CMakeFiles 12
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\Makefile2 CMakeFiles/tensor_sim.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start G:\tensor_sim\build\CMakeFiles 0
 .PHONY : CMakeFiles/tensor_sim.dir/rule
@@ -384,7 +420,7 @@ tensor_sim: CMakeFiles/tensor_sim.dir/rule
 # codegen rule for target.
 CMakeFiles/tensor_sim.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\tensor_sim.dir\build.make CMakeFiles/tensor_sim.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=7,8 "Finished codegen for target tensor_sim"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=G:\tensor_sim\build\CMakeFiles --progress-num=9,10 "Finished codegen for target tensor_sim"
 .PHONY : CMakeFiles/tensor_sim.dir/codegen
 
 # clean rule for target.

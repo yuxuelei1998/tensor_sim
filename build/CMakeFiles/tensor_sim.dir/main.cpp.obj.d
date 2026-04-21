@@ -192,4 +192,5 @@ CMakeFiles/tensor_sim.dir/main.cpp.obj: G:\tensor_sim\main.cpp \
  G:/msys64/ucrt64/include/sec_api/string_s.h \
  G:/tensor_sim/include/ampere_tensor.h \
  G:/tensor_sim/include/hopper_tensor.h \
- G:/tensor_sim/include/blackwell_tensor.h
+ G:/tensor_sim/include/blackwell_tensor.h \
+ G:/tensor_sim/include/custom_tensor.h

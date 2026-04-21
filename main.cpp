@@ -12,6 +12,7 @@
 #include "ampere_tensor.h"
 #include "hopper_tensor.h"
 #include "blackwell_tensor.h"
+#include "custom_tensor.h"
 
 namespace fs = std::filesystem;
 
@@ -38,9 +39,181 @@ int main() {
               << "  2. Ampere\n"
               << "  3. Hopper\n"
               << "  4. Blackwell\n"
-              << "Enter choice (1-4): ";
+              << "  5. Custom (fully configurable)\n"
+              << "Enter choice (1-5): ";
     int arch_choice = 0;
     std::cin >> arch_choice;
+
+    // -----------------------------------------------------------------------
+    // Custom architecture path: collect config and run directly
+    // -----------------------------------------------------------------------
+    if (arch_choice == 5) {
+        CustomConfig cfg;
+
+        std::cout << "\nSelect A/B input precision:\n"
+                  << "  1. FP16\n"
+                  << "  2. BF16\n"
+                  << "  3. FP8 E5M2\n"
+                  << "  4. FP8 E4M3\n"
+                  << "  5. FP4 E2M1\n"
+                  << "Enter choice (1-5): ";
+        int ab_ch = 0; std::cin >> ab_ch;
+        switch (ab_ch) {
+            case 1: cfg.ab_prec = CustomConfig::ABPrec::FP16;     break;
+            case 2: cfg.ab_prec = CustomConfig::ABPrec::BF16;     break;
+            case 3: cfg.ab_prec = CustomConfig::ABPrec::FP8_E5M2; break;
+            case 4: cfg.ab_prec = CustomConfig::ABPrec::FP8_E4M3; break;
+            case 5: cfg.ab_prec = CustomConfig::ABPrec::FP4_E2M1; break;
+            default: std::cerr << "Invalid.\n"; return 1;
+        }
+
+        std::cout << "\nSelect C/D accumulator precision:\n"
+                  << "  1. FP32\n"
+                  << "  2. FP16\n"
+                  << "Enter choice (1-2): ";
+        int cd_ch = 0; std::cin >> cd_ch;
+        switch (cd_ch) {
+            case 1: cfg.cd_prec = CustomConfig::CDPrec::FP32; break;
+            case 2: cfg.cd_prec = CustomConfig::CDPrec::FP16; break;
+            default: std::cerr << "Invalid.\n"; return 1;
+        }
+
+        std::cout << "\nDot-product unit width n (e.g. 4, 8, 16, 32, 64): ";
+        std::cin >> cfg.dp_width;
+        if (cfg.dp_width < 1) { std::cerr << "n must be >= 1.\n"; return 1; }
+
+        std::cout << "Intermediate mantissa bits w (1-52): ";
+        std::cin >> cfg.mant_width;
+        if (cfg.mant_width < 1 || cfg.mant_width > 52) {
+            std::cerr << "w must be 1-52.\n"; return 1;
+        }
+
+        std::cout << "\nRounding mode:\n"
+                  << "  1. RTZ (round toward zero / truncate)\n"
+                  << "  2. RNE (round to nearest even)\n"
+                  << "Enter choice (1-2): ";
+        int rm_ch = 0; std::cin >> rm_ch;
+        switch (rm_ch) {
+            case 1: cfg.round_mode = CustomConfig::RoundMode::RTZ; break;
+            case 2: cfg.round_mode = CustomConfig::RoundMode::RNE; break;
+            default: std::cerr << "Invalid.\n"; return 1;
+        }
+
+        std::cout << "\nUse scaling factors for A/B? (0=no, 1=yes): ";
+        int use_sc = 0; std::cin >> use_sc;
+        cfg.use_scale = (use_sc != 0);
+
+        if (cfg.use_scale) {
+            std::cout << "Elements per scale group x: ";
+            std::cin >> cfg.scale_group;
+            if (cfg.scale_group < 1) { std::cerr << "x must be >= 1.\n"; return 1; }
+
+            std::cout << "Scale factor format:\n"
+                      << "  1. UE8M0 (8-bit unsigned exponent, used in MXFP)\n"
+                      << "  2. UE4M3 (7-bit unsigned float, used in NVFP)\n"
+                      << "Enter choice (1-2): ";
+            int sf_ch = 0; std::cin >> sf_ch;
+            switch (sf_ch) {
+                case 1: cfg.scale_type = CustomConfig::ScaleType::UE8M0; break;
+                case 2: cfg.scale_type = CustomConfig::ScaleType::UE4M3; break;
+                default: std::cerr << "Invalid.\n"; return 1;
+            }
+
+            std::cout << "Vector length per test line (A/B elements per line): ";
+            std::cin >> cfg.vec_len;
+            if (cfg.vec_len < 1) { std::cerr << "vec_len must be >= 1.\n"; return 1; }
+        }
+
+        std::cout << "\nTest input file path: ";
+        std::string input_path;
+        std::cin >> input_path;
+
+        std::cout << "Result output file path: ";
+        std::string output_path;
+        std::cin >> output_path;
+
+        std::cout << "\n=== Custom Configuration ===\n"
+                  << "  A/B precision : "
+                  << (ab_ch==1?"FP16":ab_ch==2?"BF16":ab_ch==3?"FP8_E5M2":ab_ch==4?"FP8_E4M3":"FP4_E2M1") << "\n"
+                  << "  C/D precision : " << (cd_ch==1?"FP32":"FP16") << "\n"
+                  << "  DP width n    : " << cfg.dp_width << "\n"
+                  << "  Mant bits w   : " << cfg.mant_width << "\n"
+                  << "  Rounding      : " << (rm_ch==1?"RTZ":"RNE") << "\n"
+                  << "  Scale         : " << (cfg.use_scale?"yes":"no");
+        if (cfg.use_scale)
+            std::cout << "  (group=" << cfg.scale_group
+                      << ", type=" << (cfg.scale_type==CustomConfig::ScaleType::UE8M0?"UE8M0":"UE4M3") << ")";
+        std::cout << "\n  Input         : " << input_path
+                  << "\n  Output        : " << output_path << "\n\n";
+
+        std::ifstream fin(input_path);
+        if (!fin.is_open()) { std::cerr << "Cannot open: " << input_path << "\n"; return 1; }
+        fs::create_directories(fs::path(output_path).parent_path());
+        std::ofstream fout(output_path);
+        if (!fout.is_open()) { std::cerr << "Cannot open: " << output_path << "\n"; return 1; }
+
+        int line_num = 0;
+        std::string line;
+        while (std::getline(fin, line)) {
+            std::string stripped = trim(line);
+            if (stripped.empty()) continue;
+            ++line_num;
+
+            std::vector<uint32_t> vals;
+            std::stringstream ss(stripped);
+            std::string tok;
+            while (std::getline(ss, tok, ',')) {
+                std::string t = trim(tok);
+                if (!t.empty()) vals.push_back(parse_hex(t));
+            }
+            if (vals.size() < 3) {
+                std::cerr << "Warning: line " << line_num << " has fewer than 3 values, skipping.\n";
+                continue;
+            }
+
+            uint32_t c_raw = vals.back();
+            size_t n_ab    = vals.size() - 1;   // everything except C
+
+            size_t L, K = 0;
+            if (!cfg.use_scale) {
+                L = n_ab / 2;
+            } else {
+                L = (size_t)cfg.vec_len;
+                K = ((size_t)cfg.vec_len + cfg.scale_group - 1) / cfg.scale_group;
+                if (n_ab < 2 * L + 2 * K) {
+                    std::cerr << "Warning: line " << line_num << " too short, skipping.\n";
+                    continue;
+                }
+            }
+
+            std::vector<uint32_t> A(L), B(L);
+            for (size_t k = 0; k < L; ++k) A[k] = vals[k];
+            for (size_t k = 0; k < L; ++k) B[k] = vals[L + k];
+
+            std::vector<uint8_t> sa(K), sb(K);
+            if (cfg.use_scale) {
+                size_t base = 2 * L;
+                for (size_t k = 0; k < K; ++k) sa[k] = (uint8_t)vals[base + k];
+                for (size_t k = 0; k < K; ++k) sb[k] = (uint8_t)vals[base + K + k];
+            }
+
+            uint32_t result = custom_dot_product(
+                A.data(), B.data(),
+                cfg.use_scale ? sa.data() : nullptr,
+                cfg.use_scale ? sb.data() : nullptr,
+                L, c_raw, cfg);
+
+            fout << stripped << ", 0x";
+            if (cfg.cd_prec == CustomConfig::CDPrec::FP32)
+                fout << std::uppercase << std::hex << std::setw(8) << std::setfill('0') << result << "\n";
+            else
+                fout << std::uppercase << std::hex << std::setw(4) << std::setfill('0') << (result & 0xFFFFu) << "\n";
+        }
+
+        std::cout << "Done. Processed " << std::dec << line_num << " test case(s).\n"
+                  << "Results written to: " << output_path << "\n";
+        return 0;
+    }
 
     std::string arch_name;
     switch (arch_choice) {

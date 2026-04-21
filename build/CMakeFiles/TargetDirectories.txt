@@ -2,6 +2,7 @@ G:/tensor_sim/build/CMakeFiles/volta_sim.dir
 G:/tensor_sim/build/CMakeFiles/ampere_sim.dir
 G:/tensor_sim/build/CMakeFiles/hopper_sim.dir
 G:/tensor_sim/build/CMakeFiles/blackwell_sim.dir
+G:/tensor_sim/build/CMakeFiles/custom_sim.dir
 G:/tensor_sim/build/CMakeFiles/test_volta.dir
 G:/tensor_sim/build/CMakeFiles/test_ampere.dir
 G:/tensor_sim/build/CMakeFiles/test_hopper.dir

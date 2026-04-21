@@ -1,0 +1,2 @@
+G:\msys64\ucrt64\bin\ar.exe qc libcustom_sim.a CMakeFiles/custom_sim.dir/src/custom_tensor.cpp.obj
+G:\msys64\ucrt64\bin\ranlib.exe libcustom_sim.a

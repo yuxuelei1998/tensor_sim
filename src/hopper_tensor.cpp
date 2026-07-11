@@ -5,11 +5,18 @@
 static constexpr fp32_t NAN_OUT_FP32 = 0x7FFFFFFFu;
 static constexpr fp16_t NAN_OUT_FP16 = 0x7FFFu;
 
+// Hopper intermediate format (per element), stored UNNORMALIZED:
+//   FP16/BF16 input  : 5 carry + 2 integer + 25 frac = 32 bits
+//   FP8 (E5M2/E4M3)  : 6 carry + 2 integer + 13 frac = 21 bits
+// One normalize + round at output.
+static constexpr int FRAC_FP16BF16 = 25;
+static constexpr int FRAC_FP8      = 13;
+
 struct IntermVal {
     enum Kind : uint8_t { ZERO, NORMAL, POS_INF, NEG_INF, POS_INF_OVF, NEG_INF_OVF, NAN_VAL } kind = ZERO;
     bool     sign = false;
     int32_t  exp  = 0;
-    uint32_t mant = 0;
+    uint32_t mant = 0;  // full unnormalized significand, up to FRAC+2 bits
 };
 
 struct FP16Norm { bool sign; int32_t exp; uint32_t sig; };
@@ -23,9 +30,8 @@ static FP16Norm decode_fp16(fp16_t x) {
     int      e = fp16_exp(x);
     uint32_t m = fp16_mant(x);
     if (e == 0) {
-        int lz = __builtin_clz(m) - 22;
-        r.exp  = -15 - lz;
-        r.sig  = m << (lz + 1);
+        r.exp = -14;
+        r.sig = m;
     } else {
         r.exp = e - 15;
         r.sig = (1u << 10) | m;
@@ -39,9 +45,8 @@ static BF16Norm decode_bf16(bf16_t x) {
     int      e = bf16_exp(x);
     uint32_t m = bf16_mant(x);
     if (e == 0) {
-        int lz = __builtin_clz(m) - 25;
-        r.exp  = -127 - lz;
-        r.sig  = m << (lz + 1);
+        r.exp = -126;
+        r.sig = m;
     } else {
         r.exp = e - 127;
         r.sig = (1u << 7) | m;
@@ -55,10 +60,8 @@ static E5M2Norm decode_e5m2(e5m2_t x) {
     int      e = e5m2_exp(x);
     uint32_t m = e5m2_mant(x);
     if (e == 0) {
-
         int lead = (m >= 2) ? 1 : 0;
         r.sig = m << (2 - lead);
-
         r.exp = lead - 16;
     } else {
         r.exp = e - 15;
@@ -73,10 +76,8 @@ static E4M3Norm decode_e4m3(e4m3_t x) {
     int      e = e4m3_exp(x);
     uint32_t m = e4m3_mant(x);
     if (e == 0) {
-
         int lead_pos = (m != 0) ? (31 - __builtin_clz(m)) : -1;
         r.sig = m << (3 - lead_pos);
-
         r.exp = lead_pos - 9;
     } else {
         r.exp = e - 7;
@@ -85,64 +86,50 @@ static E4M3Norm decode_e4m3(e4m3_t x) {
     return r;
 }
 
-static void mul11_25(uint32_t sig_a, int32_t exp_a,
-                     uint32_t sig_b, int32_t exp_b,
-                     int32_t& out_exp, uint32_t& out_mant) {
-    uint32_t prod = sig_a * sig_b;
-    if (prod >= (1u << 21)) {
-
-        out_mant = (prod - (1u << 21)) << 4;
-        out_exp  = exp_a + exp_b + 1;
-    } else {
-
-        out_mant = (prod - (1u << 20)) << 5;
-        out_exp  = exp_a + exp_b;
-    }
+// Unnormalized multiplies. raw_sig = prod << (FRAC - 2*MANT_LEAD), exp = exp_a + exp_b.
+static void mul_unnorm_fp16(uint32_t sig_a, int32_t exp_a, uint32_t sig_b, int32_t exp_b,
+                            int32_t& out_exp, uint32_t& out_raw_sig) {
+    // sig_a, sig_b in [2^10, 2^11). prod in [2^20, 2^22). FRAC=25 → shift 5.
+    out_raw_sig = (sig_a * sig_b) << 5;
+    out_exp     = exp_a + exp_b;
 }
 
-static void mul8_25(uint32_t sig_a, int32_t exp_a,
-                    uint32_t sig_b, int32_t exp_b,
-                    int32_t& out_exp, uint32_t& out_mant) {
-    uint32_t prod = sig_a * sig_b;
-    if (prod >= (1u << 15)) {
-
-        out_mant = (prod - (1u << 15)) << 10;
-        out_exp  = exp_a + exp_b + 1;
-    } else {
-
-        out_mant = (prod - (1u << 14)) << 11;
-        out_exp  = exp_a + exp_b;
-    }
+static void mul_unnorm_bf16(uint32_t sig_a, int32_t exp_a, uint32_t sig_b, int32_t exp_b,
+                            int32_t& out_exp, uint32_t& out_raw_sig) {
+    // sig_a, sig_b in [2^7, 2^8). prod in [2^14, 2^16). FRAC=25 → shift 11.
+    out_raw_sig = (sig_a * sig_b) << 11;
+    out_exp     = exp_a + exp_b;
 }
 
-static void mul3_13(uint32_t sig_a, int32_t exp_a,
-                    uint32_t sig_b, int32_t exp_b,
-                    int32_t& out_exp, uint32_t& out_mant) {
-    uint32_t prod = sig_a * sig_b;
-    if (prod >= (1u << 5)) {
-
-        out_mant = (prod - (1u << 5)) << 8;
-        out_exp  = exp_a + exp_b + 1;
-    } else {
-
-        out_mant = (prod - (1u << 4)) << 9;
-        out_exp  = exp_a + exp_b;
-    }
+static void mul_unnorm_e5m2(uint32_t sig_a, int32_t exp_a, uint32_t sig_b, int32_t exp_b,
+                            int32_t& out_exp, uint32_t& out_raw_sig) {
+    // sig_a, sig_b in [2^2, 2^3). prod in [2^4, 2^6). FRAC=13 → shift 9.
+    out_raw_sig = (sig_a * sig_b) << 9;
+    out_exp     = exp_a + exp_b;
 }
 
-static void mul4_13(uint32_t sig_a, int32_t exp_a,
-                    uint32_t sig_b, int32_t exp_b,
-                    int32_t& out_exp, uint32_t& out_mant) {
-    uint32_t prod = sig_a * sig_b;
-    if (prod >= (1u << 7)) {
+static void mul_unnorm_e4m3(uint32_t sig_a, int32_t exp_a, uint32_t sig_b, int32_t exp_b,
+                            int32_t& out_exp, uint32_t& out_raw_sig) {
+    // sig_a, sig_b in [2^3, 2^4). prod in [2^6, 2^8). FRAC=13 → shift 7.
+    out_raw_sig = (sig_a * sig_b) << 7;
+    out_exp     = exp_a + exp_b;
+}
 
-        out_mant = (prod - (1u << 7)) << 6;
-        out_exp  = exp_a + exp_b + 1;
-    } else {
+// FP16-acc dynamic range clamp: products outside [2^-14, 2^16) get pre-handled.
+// raw_sig has its leading bit at FRAC (=>e_norm = exp_unnorm) or FRAC+1 (=>e_norm = exp_unnorm+1).
+static IntermVal clamp_to_fp16_acc(bool rs, int32_t exp_unnorm, uint32_t raw_sig, int FRAC) {
+    bool carry = (raw_sig >> (FRAC + 1)) != 0;
+    int32_t e_norm = exp_unnorm + (carry ? 1 : 0);
 
-        out_mant = (prod - (1u << 6)) << 7;
-        out_exp  = exp_a + exp_b;
-    }
+    if (e_norm > 15)   return {rs ? IntermVal::NEG_INF_OVF : IntermVal::POS_INF_OVF, rs};
+    if (e_norm >= -14) return {IntermVal::NORMAL, rs, exp_unnorm, raw_sig};
+
+    int shift = -14 - exp_unnorm;
+    int shift_cap = FRAC + 2;
+    if (shift >= shift_cap) return {IntermVal::ZERO};
+    uint32_t denorm_sig = raw_sig >> shift;
+    if (denorm_sig == 0) return {IntermVal::ZERO};
+    return {IntermVal::NORMAL, rs, -14, denorm_sig};
 }
 
 static IntermVal fp16_mul_fp32acc_25(fp16_t a, fp16_t b) {
@@ -154,9 +141,9 @@ static IntermVal fp16_mul_fp32acc_25(fp16_t a, fp16_t b) {
     if (fp16_is_inf(a)  || fp16_is_inf(b))
         return {rs ? IntermVal::NEG_INF : IntermVal::POS_INF, rs};
     FP16Norm na = decode_fp16(a), nb = decode_fp16(b);
-    int32_t e; uint32_t m;
-    mul11_25(na.sig, na.exp, nb.sig, nb.exp, e, m);
-    return {IntermVal::NORMAL, rs, e, m};
+    int32_t e; uint32_t s;
+    mul_unnorm_fp16(na.sig, na.exp, nb.sig, nb.exp, e, s);
+    return {IntermVal::NORMAL, rs, e, s};
 }
 
 static IntermVal fp16_mul_fp16acc_25(fp16_t a, fp16_t b) {
@@ -168,24 +155,9 @@ static IntermVal fp16_mul_fp16acc_25(fp16_t a, fp16_t b) {
     if (fp16_is_inf(a)  || fp16_is_inf(b))
         return {rs ? IntermVal::NEG_INF : IntermVal::POS_INF, rs};
     FP16Norm na = decode_fp16(a), nb = decode_fp16(b);
-    int32_t e; uint32_t m;
-    mul11_25(na.sig, na.exp, nb.sig, nb.exp, e, m);
-    if (e > 15)  return {rs ? IntermVal::NEG_INF_OVF : IntermVal::POS_INF_OVF, rs};
-    if (e >= -14) return {IntermVal::NORMAL, rs, e, m};
-
-    int shift = -14 - e;
-    static constexpr int SHIFT_CAP = 26;
-    if (shift >= SHIFT_CAP) return {IntermVal::ZERO};
-    uint64_t full_sig = ((uint64_t)1 << 25) | m;
-    uint64_t sub_sig  = full_sig >> shift;
-    if (sub_sig == 0) return {IntermVal::ZERO};
-
-    int lead = 63 - __builtin_clzll(sub_sig);
-    int32_t new_exp = lead - 39;
-    uint32_t new_mant;
-    if (lead >= 25) new_mant = (uint32_t)((sub_sig >> (lead - 25)) & 0x1FFFFFFu);
-    else            new_mant = (uint32_t)((sub_sig << (25 - lead)) & 0x1FFFFFFu);
-    return {IntermVal::NORMAL, rs, new_exp, new_mant};
+    int32_t e; uint32_t s;
+    mul_unnorm_fp16(na.sig, na.exp, nb.sig, nb.exp, e, s);
+    return {IntermVal::NORMAL, rs, e, s};
 }
 
 static IntermVal bf16_mul_fp32acc_25(bf16_t a, bf16_t b) {
@@ -197,9 +169,9 @@ static IntermVal bf16_mul_fp32acc_25(bf16_t a, bf16_t b) {
     if (bf16_is_inf(a)  || bf16_is_inf(b))
         return {rs ? IntermVal::NEG_INF : IntermVal::POS_INF, rs};
     BF16Norm na = decode_bf16(a), nb = decode_bf16(b);
-    int32_t e; uint32_t m;
-    mul8_25(na.sig, na.exp, nb.sig, nb.exp, e, m);
-    return {IntermVal::NORMAL, rs, e, m};
+    int32_t e; uint32_t s;
+    mul_unnorm_bf16(na.sig, na.exp, nb.sig, nb.exp, e, s);
+    return {IntermVal::NORMAL, rs, e, s};
 }
 
 static IntermVal e5m2_mul_fp32acc_13(e5m2_t a, e5m2_t b) {
@@ -211,9 +183,9 @@ static IntermVal e5m2_mul_fp32acc_13(e5m2_t a, e5m2_t b) {
     if (e5m2_is_inf(a)  || e5m2_is_inf(b))
         return {rs ? IntermVal::NEG_INF : IntermVal::POS_INF, rs};
     E5M2Norm na = decode_e5m2(a), nb = decode_e5m2(b);
-    int32_t e; uint32_t m;
-    mul3_13(na.sig, na.exp, nb.sig, nb.exp, e, m);
-    return {IntermVal::NORMAL, rs, e, m};
+    int32_t e; uint32_t s;
+    mul_unnorm_e5m2(na.sig, na.exp, nb.sig, nb.exp, e, s);
+    return {IntermVal::NORMAL, rs, e, s};
 }
 
 static IntermVal e5m2_mul_fp16acc_13(e5m2_t a, e5m2_t b) {
@@ -225,35 +197,19 @@ static IntermVal e5m2_mul_fp16acc_13(e5m2_t a, e5m2_t b) {
     if (e5m2_is_inf(a)  || e5m2_is_inf(b))
         return {rs ? IntermVal::NEG_INF : IntermVal::POS_INF, rs};
     E5M2Norm na = decode_e5m2(a), nb = decode_e5m2(b);
-    int32_t e; uint32_t m;
-    mul3_13(na.sig, na.exp, nb.sig, nb.exp, e, m);
-    if (e > 15)  return {rs ? IntermVal::NEG_INF_OVF : IntermVal::POS_INF_OVF, rs};
-    if (e >= -14) return {IntermVal::NORMAL, rs, e, m};
-
-    int shift = -14 - e;
-    static constexpr int SHIFT_CAP = 14;
-    if (shift >= SHIFT_CAP) return {IntermVal::ZERO};
-    uint32_t full_sig = (1u << 13) | m;
-    uint32_t sub_sig  = full_sig >> shift;
-    if (sub_sig == 0) return {IntermVal::ZERO};
-
-    int lead = 31 - __builtin_clz(sub_sig);
-    int32_t new_exp = lead - 27;
-    uint32_t new_mant;
-    if (lead >= 13) new_mant = (sub_sig >> (lead - 13)) & 0x1FFFu;
-    else            new_mant = (sub_sig << (13 - lead)) & 0x1FFFu;
-    return {IntermVal::NORMAL, rs, new_exp, new_mant};
+    int32_t e; uint32_t s;
+    mul_unnorm_e5m2(na.sig, na.exp, nb.sig, nb.exp, e, s);
+    return clamp_to_fp16_acc(rs, e, s, FRAC_FP8);
 }
 
 static IntermVal e4m3_mul_fp32acc_13(e4m3_t a, e4m3_t b) {
     bool rs = e4m3_sign(a) ^ e4m3_sign(b);
     if (e4m3_is_nan(a) || e4m3_is_nan(b))                    return {IntermVal::NAN_VAL};
-
     if (e4m3_is_zero(a) || e4m3_is_zero(b))                  return {IntermVal::ZERO};
     E4M3Norm na = decode_e4m3(a), nb = decode_e4m3(b);
-    int32_t e; uint32_t m;
-    mul4_13(na.sig, na.exp, nb.sig, nb.exp, e, m);
-    return {IntermVal::NORMAL, rs, e, m};
+    int32_t e; uint32_t s;
+    mul_unnorm_e4m3(na.sig, na.exp, nb.sig, nb.exp, e, s);
+    return {IntermVal::NORMAL, rs, e, s};
 }
 
 static IntermVal e4m3_mul_fp16acc_13(e4m3_t a, e4m3_t b) {
@@ -261,25 +217,12 @@ static IntermVal e4m3_mul_fp16acc_13(e4m3_t a, e4m3_t b) {
     if (e4m3_is_nan(a) || e4m3_is_nan(b))                    return {IntermVal::NAN_VAL};
     if (e4m3_is_zero(a) || e4m3_is_zero(b))                  return {IntermVal::ZERO};
     E4M3Norm na = decode_e4m3(a), nb = decode_e4m3(b);
-    int32_t e; uint32_t m;
-    mul4_13(na.sig, na.exp, nb.sig, nb.exp, e, m);
-    if (e > 15)  return {rs ? IntermVal::NEG_INF_OVF : IntermVal::POS_INF_OVF, rs};
-    if (e >= -14) return {IntermVal::NORMAL, rs, e, m};
-
-    int shift = -14 - e;
-    static constexpr int SHIFT_CAP = 14;
-    if (shift >= SHIFT_CAP) return {IntermVal::ZERO};
-    uint32_t full_sig = (1u << 13) | m;
-    uint32_t sub_sig  = full_sig >> shift;
-    if (sub_sig == 0) return {IntermVal::ZERO};
-    int lead = 31 - __builtin_clz(sub_sig);
-    int32_t new_exp = lead - 27;
-    uint32_t new_mant;
-    if (lead >= 13) new_mant = (sub_sig >> (lead - 13)) & 0x1FFFu;
-    else            new_mant = (sub_sig << (13 - lead)) & 0x1FFFu;
-    return {IntermVal::NORMAL, rs, new_exp, new_mant};
+    int32_t e; uint32_t s;
+    mul_unnorm_e4m3(na.sig, na.exp, nb.sig, nb.exp, e, s);
+    return clamp_to_fp16_acc(rs, e, s, FRAC_FP8);
 }
 
+// C encoders. raw_sig = (1 << FRAC) | (c_frac_aligned_to_FRAC_bits).
 static IntermVal fp32_to_intermed25(fp32_t c) {
     bool sc = fp32_sign(c);
     int  e  = fp32_exp(c);
@@ -288,15 +231,13 @@ static IntermVal fp32_to_intermed25(fp32_t c) {
     if (e == 0xFF && m == 0) return {sc ? IntermVal::NEG_INF : IntermVal::POS_INF, sc};
     if (fp32_is_zero(c))     return {IntermVal::ZERO};
     if (e == 0) {
-
         int lz = __builtin_clz(m) - 9;
-        int32_t  unb  = -127 - lz;
-        int frac_shift = 25 - (22 - lz);
-        uint32_t mant25 = (m - (1u << (22 - lz))) << frac_shift;
-        return {IntermVal::NORMAL, sc, unb, mant25};
+        int p  = 22 - lz;
+        int32_t unb = p - 149;
+        uint32_t mant25 = (m - (1u << p)) << (25 - p);
+        return {IntermVal::NORMAL, sc, unb, (1u << FRAC_FP16BF16) | mant25};
     }
-
-    return {IntermVal::NORMAL, sc, e - 127, m << 2};
+    return {IntermVal::NORMAL, sc, e - 127, (1u << FRAC_FP16BF16) | (m << 2)};
 }
 
 static IntermVal fp16_to_intermed25(fp16_t c) {
@@ -307,17 +248,16 @@ static IntermVal fp16_to_intermed25(fp16_t c) {
     if (e == 31 && m == 0) return {sc ? IntermVal::NEG_INF : IntermVal::POS_INF, sc};
     if (fp16_is_zero(c))   return {IntermVal::ZERO};
     if (e == 0) {
-
         int lz  = __builtin_clz(m) - 22;
         int unb = -15 - lz;
         uint32_t sig11  = m << (lz + 1);
-        uint32_t mant25 = (sig11 & 0x3FFu) << 15;
-        return {IntermVal::NORMAL, sc, unb, mant25};
+        uint32_t mant25 = (sig11 & 0x3FFu) << (FRAC_FP16BF16 - 10);
+        return {IntermVal::NORMAL, sc, unb, (1u << FRAC_FP16BF16) | mant25};
     }
-
-    return {IntermVal::NORMAL, sc, e - 15, m << 15};
+    return {IntermVal::NORMAL, sc, e - 15, (1u << FRAC_FP16BF16) | (m << (FRAC_FP16BF16 - 10))};
 }
 
+// FP8-acc path has only 13 frac bits, so a FP32 C is truncated.
 static IntermVal fp32_to_intermed13(fp32_t c) {
     bool sc = fp32_sign(c);
     int  e  = fp32_exp(c);
@@ -326,11 +266,11 @@ static IntermVal fp32_to_intermed13(fp32_t c) {
     if (e == 0xFF && m == 0) return {sc ? IntermVal::NEG_INF : IntermVal::POS_INF, sc};
     if (fp32_is_zero(c))     return {IntermVal::ZERO};
     if (e == 0) {
-
+        // Subnormal FP32 is far below FP8 dynamic range.
         return {IntermVal::ZERO};
     }
-
-    return {IntermVal::NORMAL, sc, e - 127, (m >> 10) & 0x1FFFu};
+    uint32_t mant13 = (m >> 10) & 0x1FFFu;
+    return {IntermVal::NORMAL, sc, e - 127, (1u << FRAC_FP8) | mant13};
 }
 
 static IntermVal fp16_to_intermed13(fp16_t c) {
@@ -341,22 +281,18 @@ static IntermVal fp16_to_intermed13(fp16_t c) {
     if (e == 31 && m == 0) return {sc ? IntermVal::NEG_INF : IntermVal::POS_INF, sc};
     if (fp16_is_zero(c))   return {IntermVal::ZERO};
     if (e == 0) {
-
         int lz  = __builtin_clz(m) - 22;
         int unb = -15 - lz;
         uint32_t sig11  = m << (lz + 1);
-
         uint32_t mant13 = (sig11 & 0x3FFu) << 3;
-        return {IntermVal::NORMAL, sc, unb, mant13};
+        return {IntermVal::NORMAL, sc, unb, (1u << FRAC_FP8) | mant13};
     }
-
-    return {IntermVal::NORMAL, sc, e - 15, (m << 3) & 0x1FFFu};
+    return {IntermVal::NORMAL, sc, e - 15, (1u << FRAC_FP8) | (m << 3)};
 }
 
 template<typename T>
 static bool check_specials_n(const IntermVal* v, int n,
                               T nan_out, T pos_inf_out, T neg_inf_out, T& out) {
-
     for (int i = 0; i < n; ++i)
         if (v[i].kind == IntermVal::NAN_VAL) { out = nan_out; return true; }
 
@@ -365,9 +301,7 @@ static bool check_specials_n(const IntermVal* v, int n,
         if (v[i].kind == IntermVal::POS_INF) true_pos = true;
         if (v[i].kind == IntermVal::NEG_INF) true_neg = true;
     }
-
     if (true_pos && true_neg) { out = nan_out;     return true; }
-
     if (true_pos)             { out = pos_inf_out; return true; }
     if (true_neg)             { out = neg_inf_out; return true; }
 
@@ -383,7 +317,7 @@ static bool check_specials_n(const IntermVal* v, int n,
     return false;
 }
 
-static void align_accum_n(const IntermVal* v, int n, int mant_bits,
+static void align_accum_n(const IntermVal* v, int n, int frac_bits,
                            bool& sign_out, uint64_t& abs_out, int32_t& max_exp_out) {
     int32_t max_exp = INT32_MIN;
     for (int i = 0; i < n; ++i)
@@ -393,14 +327,13 @@ static void align_accum_n(const IntermVal* v, int n, int mant_bits,
 
     if (max_exp == INT32_MIN) { sign_out = false; abs_out = 0; return; }
 
-    const int shift_cap = mant_bits + 1;
+    const int shift_cap = frac_bits + 2;
     int64_t accum = 0;
     for (int i = 0; i < n; ++i) {
         if (v[i].kind != IntermVal::NORMAL) continue;
         int shift = max_exp - v[i].exp;
         if (shift >= shift_cap) continue;
-        uint64_t sig     = ((uint64_t)1 << mant_bits) | v[i].mant;
-        uint64_t aligned = sig >> shift;
+        uint64_t aligned = (uint64_t)v[i].mant >> shift;
         if (v[i].sign) accum -= (int64_t)aligned;
         else           accum += (int64_t)aligned;
     }
@@ -409,17 +342,17 @@ static void align_accum_n(const IntermVal* v, int n, int mant_bits,
     abs_out  = sign_out ? (uint64_t)(-accum) : (uint64_t)accum;
 }
 
-static fp32_t accumulate_fp32_trunc(const IntermVal* v, int n, int mant_bits) {
+static fp32_t accumulate_fp32_trunc(const IntermVal* v, int n, int frac_bits) {
     fp32_t sig_out;
     if (check_specials_n<fp32_t>(v, n, NAN_OUT_FP32, 0x7F800000u, 0xFF800000u, sig_out))
         return sig_out;
 
     bool rs; uint64_t abs_sum; int32_t max_exp;
-    align_accum_n(v, n, mant_bits, rs, abs_sum, max_exp);
+    align_accum_n(v, n, frac_bits, rs, abs_sum, max_exp);
     if (abs_sum == 0) return 0u;
 
     int lead    = 63 - __builtin_clzll(abs_sum);
-    int32_t unb = lead + max_exp - mant_bits;
+    int32_t unb = lead + max_exp - frac_bits;
     int32_t bsd = unb + 127;
 
     uint32_t mant23;
@@ -429,38 +362,38 @@ static fp32_t accumulate_fp32_trunc(const IntermVal* v, int n, int mant_bits) {
     if (bsd >= 255) return rs ? 0xFF800000u : 0x7F800000u;
 
     if (bsd <= 0) {
-
         int sub_shift = 1 - bsd;
-        if (sub_shift >= 24) return (uint32_t)rs << 31;
+        if (sub_shift >= 24) return 0u;
         uint32_t sub_mant = ((1u << 23) | mant23) >> sub_shift;
+        if (sub_mant == 0) return 0u;
         return ((uint32_t)rs << 31) | sub_mant;
     }
 
     return ((uint32_t)rs << 31) | ((uint32_t)bsd << 23) | mant23;
 }
 
-static fp16_t accumulate_fp16_rne(const IntermVal* v, int n, int mant_bits) {
+static fp16_t accumulate_fp16_rne(const IntermVal* v, int n, int frac_bits) {
     fp16_t sig_out;
     if (check_specials_n<fp16_t>(v, n, NAN_OUT_FP16, 0x7C00u, 0xFC00u, sig_out))
         return sig_out;
 
     bool rs; uint64_t abs_sum; int32_t max_exp;
-    align_accum_n(v, n, mant_bits, rs, abs_sum, max_exp);
+    align_accum_n(v, n, frac_bits, rs, abs_sum, max_exp);
     if (abs_sum == 0) return 0u;
 
     int lead    = 63 - __builtin_clzll(abs_sum);
-    int32_t unb = lead + max_exp - mant_bits;
+    int32_t unb = lead + max_exp - frac_bits;
 
     uint32_t mantX; bool sticky = false;
-    if (lead >= mant_bits) {
-        int rs2 = lead - mant_bits;
-        mantX   = (uint32_t)((abs_sum >> rs2) & ((1u << mant_bits) - 1));
+    if (lead >= frac_bits) {
+        int rs2 = lead - frac_bits;
+        mantX   = (uint32_t)((abs_sum >> rs2) & ((1u << frac_bits) - 1));
         sticky  = (rs2 > 0) && ((abs_sum & ((1ULL << rs2) - 1)) != 0);
     } else {
-        mantX = (uint32_t)((abs_sum << (mant_bits - lead)) & ((1u << mant_bits) - 1));
+        mantX = (uint32_t)((abs_sum << (frac_bits - lead)) & ((1u << frac_bits) - 1));
     }
 
-    const int RND_SHIFT = mant_bits - 10;
+    const int RND_SHIFT = frac_bits - 10;
 
     auto rne_round_up = [](uint32_t mant10, int round_b, bool stk) -> bool {
         if (!round_b) return false;
@@ -483,18 +416,16 @@ static fp16_t accumulate_fp16_rne(const IntermVal* v, int n, int mant_bits) {
     }
 
     {
+        int shift_s = frac_bits - 24 - unb;
+        uint64_t sig_full = ((uint64_t)1 << frac_bits) | mantX;
 
-        int shift_s = mant_bits - 24 - unb;
-        uint64_t sig_full = ((uint64_t)1 << mant_bits) | mantX;
-
-        if (shift_s > mant_bits) {
-
+        if (shift_s > frac_bits) {
             int rnd_pos = shift_s - 1;
-            int rnd_bit = (rnd_pos <= mant_bits) ? (int)((sig_full >> rnd_pos) & 1) : 0;
-            bool stk2   = sticky || (rnd_pos > 0 && rnd_pos <= mant_bits &&
+            int rnd_bit = (rnd_pos <= frac_bits) ? (int)((sig_full >> rnd_pos) & 1) : 0;
+            bool stk2   = sticky || (rnd_pos > 0 && rnd_pos <= frac_bits &&
                                      ((sig_full & ((1ULL << rnd_pos) - 1)) != 0));
             bool ru = rne_round_up(0u, rnd_bit, stk2);
-            if (!ru) return (fp16_t)((uint32_t)rs << 15);
+            if (!ru) return 0u;
             return (fp16_t)(((uint32_t)rs << 15) | 1u);
         }
 
@@ -507,7 +438,7 @@ static fp16_t accumulate_fp16_rne(const IntermVal* v, int n, int mant_bits) {
             if (mant10_s >= (1u << 10))
                 return (fp16_t)(((uint32_t)rs << 15) | (1u << 10));
         }
-        if (mant10_s == 0) return (fp16_t)((uint32_t)rs << 15);
+        if (mant10_s == 0) return 0u;
         return (fp16_t)(((uint32_t)rs << 15) | mant10_s);
     }
 
@@ -526,7 +457,7 @@ static fp32_t hopper_dp16a_fp32_group(const fp16_t a[16], const fp16_t b[16], fp
     IntermVal v[17];
     for (int i = 0; i < 16; ++i) v[i] = fp16_mul_fp32acc_25(a[i], b[i]);
     v[16] = fp32_to_intermed25(c);
-    return accumulate_fp32_trunc(v, 17, 25);
+    return accumulate_fp32_trunc(v, 17, FRAC_FP16BF16);
 }
 
 static fp16_t hopper_dp16a_fp16_group(const fp16_t a[16], const fp16_t b[16], fp16_t c) {
@@ -540,7 +471,7 @@ static fp16_t hopper_dp16a_fp16_group(const fp16_t a[16], const fp16_t b[16], fp
     IntermVal v[17];
     for (int i = 0; i < 16; ++i) v[i] = fp16_mul_fp16acc_25(a[i], b[i]);
     v[16] = fp16_to_intermed25(c);
-    return accumulate_fp16_rne(v, 17, 25);
+    return accumulate_fp16_rne(v, 17, FRAC_FP16BF16);
 }
 
 static fp32_t hopper_dp16a_bf16_group(const bf16_t a[16], const bf16_t b[16], fp32_t c) {
@@ -554,7 +485,7 @@ static fp32_t hopper_dp16a_bf16_group(const bf16_t a[16], const bf16_t b[16], fp
     IntermVal v[17];
     for (int i = 0; i < 16; ++i) v[i] = bf16_mul_fp32acc_25(a[i], b[i]);
     v[16] = fp32_to_intermed25(c);
-    return accumulate_fp32_trunc(v, 17, 25);
+    return accumulate_fp32_trunc(v, 17, FRAC_FP16BF16);
 }
 
 static fp32_t hopper_dp32a_e5m2_fp32_group(const e5m2_t a[32], const e5m2_t b[32], fp32_t c) {
@@ -568,7 +499,7 @@ static fp32_t hopper_dp32a_e5m2_fp32_group(const e5m2_t a[32], const e5m2_t b[32
     IntermVal v[33];
     for (int i = 0; i < 32; ++i) v[i] = e5m2_mul_fp32acc_13(a[i], b[i]);
     v[32] = fp32_to_intermed13(c);
-    return accumulate_fp32_trunc(v, 33, 13);
+    return accumulate_fp32_trunc(v, 33, FRAC_FP8);
 }
 
 static fp16_t hopper_dp32a_e5m2_fp16_group(const e5m2_t a[32], const e5m2_t b[32], fp16_t c) {
@@ -582,20 +513,19 @@ static fp16_t hopper_dp32a_e5m2_fp16_group(const e5m2_t a[32], const e5m2_t b[32
     IntermVal v[33];
     for (int i = 0; i < 32; ++i) v[i] = e5m2_mul_fp16acc_13(a[i], b[i]);
     v[32] = fp16_to_intermed13(c);
-    return accumulate_fp16_rne(v, 33, 13);
+    return accumulate_fp16_rne(v, 33, FRAC_FP8);
 }
 
 static fp32_t hopper_dp32a_e4m3_fp32_group(const e4m3_t a[32], const e4m3_t b[32], fp32_t c) {
     for (int i = 0; i < 32; ++i) {
         if (e4m3_is_nan(a[i]) || e4m3_is_nan(b[i]))        return NAN_OUT_FP32;
-
     }
     if (fp32_is_nan(c)) return NAN_OUT_FP32;
 
     IntermVal v[33];
     for (int i = 0; i < 32; ++i) v[i] = e4m3_mul_fp32acc_13(a[i], b[i]);
     v[32] = fp32_to_intermed13(c);
-    return accumulate_fp32_trunc(v, 33, 13);
+    return accumulate_fp32_trunc(v, 33, FRAC_FP8);
 }
 
 static fp16_t hopper_dp32a_e4m3_fp16_group(const e4m3_t a[32], const e4m3_t b[32], fp16_t c) {
@@ -607,7 +537,7 @@ static fp16_t hopper_dp32a_e4m3_fp16_group(const e4m3_t a[32], const e4m3_t b[32
     IntermVal v[33];
     for (int i = 0; i < 32; ++i) v[i] = e4m3_mul_fp16acc_13(a[i], b[i]);
     v[32] = fp16_to_intermed13(c);
-    return accumulate_fp16_rne(v, 33, 13);
+    return accumulate_fp16_rne(v, 33, FRAC_FP8);
 }
 
 fp32_t hopper_dp16a_fp32(const fp16_t* a, const fp16_t* b, size_t len, fp32_t c) {
